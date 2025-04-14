@@ -355,14 +355,19 @@ const Navbar: React.FC = () => {
               >
                 {session && session.user?.image ? (
                   <img 
-                    src={`${session.user.image}?t=${new Date().getTime()}`} 
+                    src={`${session.user.image}?t=${Date.now()}`}
                     alt="Profil" 
                     className="w-6 h-6 rounded-full mr-2"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null; // Sonsuz döngüyü engelle
+                      target.src = "/images/avatars/default.png"; // Yedek resim
+                    }}
                   />
                 ) : (
                   <span className="mr-2">{menuItems[4].icon}</span>
                 )}
-                {session ? "Profil" : "Giriş Yap"}
+                {session ? (session.user?.name || "Profil") : "Giriş Yap"}
               </Link>
             </div>
           </div>

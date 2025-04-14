@@ -19,7 +19,7 @@ const formatCreator = (creator: any) => {
   // Creator tamamen boş veya undefined
   if (!creator) {
     console.log("Creator boş, varsayılan değer kullanılıyor");
-    return { username: 'Anonim' };
+    return { username: 'İsimsiz' };
   }
   
   // Creator bir obje ve username içeriyor
@@ -38,7 +38,7 @@ const formatCreator = (creator: any) => {
   console.log("Creator ID'ye dönüştürülüyor, tip:", typeof creator);
   
   return { 
-    username: 'Anonim', 
+    username: 'İsimsiz', 
     _id: creator?.toString ? creator.toString() : String(creator)
   };
 };
