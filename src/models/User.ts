@@ -1,6 +1,15 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+// Sistem tarafından rezerve edilmiş kullanıcı adları
+const RESERVED_USERNAMES = [
+  'admin', 'planlar', 'takvim', 'profil', 'api', 'giris', 'kayit', 'plan', 'ai-check',
+  'about', 'login', 'register', 'help', 'support', 'contact', 'terms', 'privacy',
+  'settings', 'notifications', 'messages', 'search', 'explore', 'home', 'trending',
+  'checkday', 'app', 'dashboard', 'user', 'users', 'account', 'accounts', 'auth',
+  'static', 'assets', 'public', 'images', 'js', 'css', 'sifremi-sifirla'
+];
+
 export interface IUser extends Document {
   username: string;
   email: string;
@@ -34,8 +43,17 @@ const UserSchema = new Schema<IUser>(
       required: [true, 'Kullanıcı adı zorunludur'],
       unique: true,
       trim: true,
+      lowercase: true, // Tüm kullanıcı adları küçük harfe çevrilir
       minlength: [3, 'Kullanıcı adı en az 3 karakter olmalıdır'],
       maxlength: [20, 'Kullanıcı adı en fazla 20 karakter olabilir'],
+      match: [/^[a-z0-9_.]+$/, 'Kullanıcı adı sadece küçük harf, rakam, nokta ve alt çizgi içerebilir'],
+      validate: {
+        validator: function(username: string) {
+          // Rezerve edilmiş kullanıcı adlarını kontrol et
+          return !RESERVED_USERNAMES.includes(username.toLowerCase());
+        },
+        message: props => `${props.value} kullanıcı adı sistem tarafından rezerve edilmiştir ve kullanılamaz`
+      }
     },
     email: {
       type: String,

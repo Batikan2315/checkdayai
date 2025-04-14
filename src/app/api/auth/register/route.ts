@@ -5,6 +5,15 @@ import { generateToken, generateVerificationToken } from "@/lib/auth";
 import nodemailer from "nodemailer";
 import bcryptjs from "bcryptjs";
 
+// Sistem tarafından rezerve edilmiş kullanıcı adları
+const RESERVED_USERNAMES = [
+  'admin', 'planlar', 'takvim', 'profil', 'api', 'giris', 'kayit', 'plan', 'ai-check',
+  'about', 'login', 'register', 'help', 'support', 'contact', 'terms', 'privacy',
+  'settings', 'notifications', 'messages', 'search', 'explore', 'home', 'trending',
+  'checkday', 'app', 'dashboard', 'user', 'users', 'account', 'accounts', 'auth',
+  'static', 'assets', 'public', 'images', 'js', 'css', 'sifremi-sifirla'
+];
+
 // E-posta gönderme fonksiyonu
 async function sendVerificationEmail(email: string, token: string) {
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -81,6 +90,34 @@ export async function POST(req: NextRequest) {
       );
     }
     
+    // Kullanıcı adı için ek kontroller
+    if (username) {
+      // Kullanıcı adı formatını kontrol et
+      const usernameRegex = /^[a-zA-Z0-9_.]+$/;
+      if (!usernameRegex.test(username)) {
+        return NextResponse.json(
+          { message: "Kullanıcı adı sadece harf, rakam, nokta ve alt çizgi içerebilir" },
+          { status: 400 }
+        );
+      }
+      
+      // Kullanıcı adı uzunluğunu kontrol et
+      if (username.length < 3 || username.length > 20) {
+        return NextResponse.json(
+          { message: "Kullanıcı adı 3-20 karakter arasında olmalıdır" },
+          { status: 400 }
+        );
+      }
+      
+      // Rezerve edilmiş kullanıcı adlarını kontrol et
+      if (RESERVED_USERNAMES.includes(username.toLowerCase())) {
+        return NextResponse.json(
+          { message: "Bu kullanıcı adı sistem tarafından rezerve edilmiştir ve kullanılamaz" },
+          { status: 400 }
+        );
+      }
+    }
+    
     // E-posta ve kullanıcı adı benzersizliğini kontrol et
     const emailExists = await User.findOne({ email });
     if (emailExists) {
@@ -91,7 +128,7 @@ export async function POST(req: NextRequest) {
     }
     
     if (username) {
-      const usernameExists = await User.findOne({ username });
+      const usernameExists = await User.findOne({ username: username.toLowerCase() });
       if (usernameExists) {
         return NextResponse.json(
           { message: "Bu kullanıcı adı zaten kullanımda" },
@@ -105,7 +142,7 @@ export async function POST(req: NextRequest) {
     
     // Yeni kullanıcı oluştur
     const newUser = new User({
-      username,
+      username: username ? username.toLowerCase() : undefined,
       email,
       password: hashedPassword,
       firstName,
@@ -114,7 +151,7 @@ export async function POST(req: NextRequest) {
       role: "user"
     });
     
-    // Otomatik kullanıcı adı oluştur
+    // Otomatik kullanıcı adı oluşturma - Model'deki validator tarafından kontrol edilecek
     if (!username) {
       await newUser.generateUsername();
     }

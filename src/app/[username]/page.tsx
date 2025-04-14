@@ -25,9 +25,10 @@ export default function UserProfile() {
         if (!username) return;
         
         setLoading(true);
-        // username parametresindeki @ işaretini kaldır
-        const cleanUsername = username.toString().replace('@', '');
-        console.log(`Parametre: ${username}, Temizlenmiş username: ${cleanUsername}`);
+        // username parametresindeki @ işaretini kaldır ve küçük harfe dönüştür
+        const usernameStr = typeof username === 'string' ? username : Array.isArray(username) ? username[0] : '';
+        const cleanUsername = usernameStr.replace('@', '').toLowerCase();
+        console.log(`Parametre: ${usernameStr}, Temizlenmiş username: ${cleanUsername}`);
         
         // API uç noktasını kullanarak kullanıcı bilgilerini getir
         const response = await fetch(`/api/user/profile?username=${cleanUsername}`);
