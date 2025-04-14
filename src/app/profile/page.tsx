@@ -84,7 +84,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user && !authLoading) {
-      router.push("/giris");
+      router.push("/login");
     } else if (user && user._id) {
       // Sadece ilk yüklemede planları yükle, refreshUserData() çağırma
       if (userPlans.length === 0) {
@@ -702,13 +702,13 @@ export default function Profile() {
               date={new Date(plan.startDate || Date.now())}
               location={plan.location || (plan.isOnline ? 'Online' : 'Belirtilmemiş')}
               imageUrl={plan.imageUrl}
-              creator={formatCreator(plan.creator)}
+              creator={plan.creator ? formatCreator(plan.creator) : formatCreator(user)}
               isOnline={plan.isOnline}
               isFree={plan.isFree}
               price={plan.price || 0}
               maxParticipants={plan.maxParticipants || 0}
               participantCount={plan.participants?.length || 0}
-              isJoined={true}
+              isJoined={false}
             />
           ))}
         </div>
@@ -916,79 +916,75 @@ export default function Profile() {
 
   return (
     <PageContainer>
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Profil Başlık */}
-        <div className="flex flex-col md:flex-row items-center mb-8">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Profil</h1>
-        </div>
-
-        {/* Sekmeler */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <div className="flex flex-wrap border-b border-gray-200 dark:border-gray-700">
-            <button
-              className={`flex items-center px-4 py-3 text-sm font-medium ${
-                activeTab === "profile" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-              }`}
-                  onClick={() => setActiveTab("profile")}
-                >
-              <FaUser className="mr-2" />
-              <span>Profil</span>
-            </button>
-            <button
-              className={`flex items-center px-4 py-3 text-sm font-medium ${
-                activeTab === "plans" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-              }`}
-                  onClick={() => setActiveTab("plans")}
-                >
-              <FaCalendarAlt className="mr-2" />
-              <span>Planlarım</span>
-            </button>
-            <button
-              className={`flex items-center px-4 py-3 text-sm font-medium ${
-                activeTab === "saved" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-              }`}
-                  onClick={() => setActiveTab("saved")}
-                >
-              <FaBookmark className="mr-2" />
-              <span>Kaydedilenler</span>
-            </button>
-            <button
-              className={`flex items-center px-4 py-3 text-sm font-medium ${
-                activeTab === "likes" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-              }`}
-                  onClick={() => setActiveTab("likes")}
-                >
-              <FaHeart className="mr-2" />
-              <span>Beğenilenler</span>
-            </button>
-            <button
-              className={`flex items-center px-4 py-3 text-sm font-medium ${
-                activeTab === "wallet" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-              }`}
-                  onClick={() => setActiveTab("wallet")}
-                >
-              <FaWallet className="mr-2" />
-              <span>Cüzdan</span>
-            </button>
-            <button
-              className={`flex items-center px-4 py-3 text-sm font-medium ${
-                activeTab === "notifications" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-              }`}
-              onClick={() => setActiveTab("notifications")}
-            >
-              <FaBell className="mr-2" />
-              <span>Bildirimler</span>
-            </button>
-              </div>
-
-          <div className="p-4">
-            {activeTab === "profile" && renderProfileTab()}
-            {activeTab === "plans" && renderPlansTab()}
-            {activeTab === "saved" && renderSavedPlansTab()}
-            {activeTab === "likes" && renderLikedPlansTab()}
-            {activeTab === "wallet" && renderWalletTab()}
-            {activeTab === "notifications" && renderNotificationsTab()}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <div className="flex whitespace-nowrap overflow-x-auto">
+              <button
+                className={`flex items-center px-4 py-3 text-sm font-medium ${
+                  activeTab === "profile" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
+                }`}
+                onClick={() => setActiveTab("profile")}
+              >
+                <FaUser className="mr-2" />
+                <span>Profil</span>
+              </button>
+              <button
+                className={`flex items-center px-4 py-3 text-sm font-medium ${
+                  activeTab === "plans" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
+                }`}
+                onClick={() => setActiveTab("plans")}
+              >
+                <FaCalendarAlt className="mr-2" />
+                <span>Planlarım</span>
+              </button>
+              <button
+                className={`flex items-center px-4 py-3 text-sm font-medium ${
+                  activeTab === "saved" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
+                }`}
+                onClick={() => setActiveTab("saved")}
+              >
+                <FaBookmark className="mr-2" />
+                <span>Kaydedilenler</span>
+              </button>
+              <button
+                className={`flex items-center px-4 py-3 text-sm font-medium ${
+                  activeTab === "likes" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
+                }`}
+                onClick={() => setActiveTab("likes")}
+              >
+                <FaHeart className="mr-2" />
+                <span>Beğenilenler</span>
+              </button>
+              <button
+                className={`flex items-center px-4 py-3 text-sm font-medium ${
+                  activeTab === "wallet" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
+                }`}
+                onClick={() => setActiveTab("wallet")}
+              >
+                <FaWallet className="mr-2" />
+                <span>Cüzdan</span>
+              </button>
+              <button
+                className={`flex items-center px-4 py-3 text-sm font-medium ${
+                  activeTab === "notifications" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
+                }`}
+                onClick={() => setActiveTab("notifications")}
+              >
+                <FaBell className="mr-2" />
+                <span>Bildirimler</span>
+              </button>
             </div>
+
+            <div className="p-4">
+              {activeTab === "profile" && renderProfileTab()}
+              {activeTab === "plans" && renderPlansTab()}
+              {activeTab === "saved" && renderSavedPlansTab()}
+              {activeTab === "likes" && renderLikedPlansTab()}
+              {activeTab === "wallet" && renderWalletTab()}
+              {activeTab === "notifications" && renderNotificationsTab()}
+            </div>
+          </div>
         </div>
       </div>
     </PageContainer>

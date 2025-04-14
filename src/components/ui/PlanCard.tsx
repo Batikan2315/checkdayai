@@ -434,14 +434,22 @@ export default function PlanCard({
                   >
                     Plan Odası
                   </Button>
+                ) : isJoined ? (
+                  <Button 
+                    variant="primary" 
+                    className="w-full" 
+                    onClick={handleGoToRoom}
+                  >
+                    Plan Odası
+                  </Button>
                 ) : (
                   <Button 
                     variant="primary" 
                     className="w-full" 
                     onClick={handleJoin} 
-                    disabled={isJoined || joining}
+                    disabled={joining}
                   >
-                    {isJoined ? "Katıldınız" : joining ? "İşlem yapılıyor..." : "Katıl"}
+                    {joining ? "İşlem yapılıyor..." : "Katıl"}
                   </Button>
                 )}
               </div>
