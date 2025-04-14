@@ -233,7 +233,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.ok) {
         toast.success("Kayıt başarılı! Lütfen e-posta adresinizi doğrulayın ve giriş yapın.");
-        router.push("/giris");
+        router.push("/login");
         return true;
       } else {
         toast.error(data.message || "Kayıt başarısız!");
@@ -254,8 +254,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Eski yöntem çıkışı
     localStorage.removeItem("token");
+    localStorage.removeItem("authInfo");
     setUser(null);
-    router.push("/giris");
+    
+    // Tarayıcıyı çerezleri temizlemek için sayfayı yenileme çözümü
+    window.location.href = "/login";
   };
 
   const loginWithGoogle = async (email: string, password: string) => {

@@ -86,13 +86,16 @@ export default function Profile() {
     if (!user && !authLoading) {
       router.push("/login");
     } else if (user && user._id) {
-      // Sadece ilk yüklemede planları yükle, refreshUserData() çağırma
-      if (userPlans.length === 0) {
-        fetchUserPlans();
-      }
-      if (savedPlans.length === 0) {
-        fetchSavedPlans();
-      }
+      // Kullanıcı bilgilerini yenile ve planları getir
+      refreshUserData().then(() => {
+        // Sadece ilk yüklemede planları yükle
+        if (userPlans.length === 0) {
+          fetchUserPlans();
+        }
+        if (savedPlans.length === 0) {
+          fetchSavedPlans();
+        }
+      });
     }
   }, [user, authLoading, router]);
 

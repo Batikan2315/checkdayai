@@ -56,7 +56,7 @@ const RegisterForm = () => {
       
       if (success) {
         toast.success("Kayıt başarılı! Giriş yapabilirsiniz.");
-        router.push("/giris");
+        router.push("/login");
       }
     } catch (error) {
       console.error("Kayıt hatası:", error);

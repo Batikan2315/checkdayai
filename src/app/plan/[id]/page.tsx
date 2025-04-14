@@ -465,7 +465,7 @@ export default function PlanDetail() {
       </div>
     );
   }
-
+  
   return (
     <div className="container mx-auto py-8">
       <Card className="overflow-hidden">

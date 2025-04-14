@@ -153,18 +153,18 @@ export default function Home() {
             <h1 className="text-3xl md:text-4xl font-bold mb-4">Planlarını Keşfet</h1>
             <p className="text-lg mb-6 opacity-90 max-w-2xl mx-auto">
               CheckDay ile hayatını planla, planlara katıl veya kendi planlarını oluştur.
-            </p>
-            <div className="flex flex-wrap justify-center gap-4">
+          </p>
+          <div className="flex flex-wrap justify-center gap-4">
               <Link href="/plan/create">
-                <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50">
+              <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50">
                     <FaCalendarAlt className="mr-2" /> Plan Oluştur
                   </Button>
                 </Link>
                 <Link href="/plans">
                   <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
                     <FaSearch className="mr-2" /> Planları Keşfet
-                </Button>
-              </Link>
+              </Button>
+            </Link>
               </div>
             </section>
         )}
@@ -278,7 +278,7 @@ export default function Home() {
         {/* Yaklaşan Planlar Bölümü */}
         {plans && plans.length > 0 && (
           <section className="py-10">
-            <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-6">
               <h2 className="text-3xl font-bold">Yaklaşan Planlar</h2>
               <Link href="/plans">
                 <Button variant="outline" className="gap-2">

@@ -400,8 +400,8 @@ const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
-    signIn: "/giris",
-    error: "/giris?error=AuthError",
+    signIn: "/login",
+    error: "/login"
   },
   debug: process.env.NODE_ENV === "development",
 };
