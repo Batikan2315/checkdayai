@@ -426,15 +426,7 @@ export default function PlanCard({
               
               {/* Katıl/Katıldınız veya Plan Odası butonu */}
               <div className="mt-auto pt-4">
-                {isOwner ? (
-                  <Button 
-                    variant="primary" 
-                    className="w-full" 
-                    onClick={handleGoToRoom}
-                  >
-                    Plan Odası
-                  </Button>
-                ) : isJoined ? (
+                {isOwner || isJoined ? (
                   <Button 
                     variant="primary" 
                     className="w-full" 

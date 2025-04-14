@@ -717,7 +717,7 @@ export default function Profile() {
               price={plan.price || 0}
               maxParticipants={plan.maxParticipants || 0}
               participantCount={plan.participants?.length || 0}
-              isJoined={false}
+              isJoined={true}
             />
           ))}
         </div>
