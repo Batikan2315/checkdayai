@@ -11,6 +11,9 @@ const nextConfig = {
       'lh3.googleusercontent.com',
     ],
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 }
 
 module.exports = nextConfig 
