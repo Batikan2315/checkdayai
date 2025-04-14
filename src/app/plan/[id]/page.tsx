@@ -314,7 +314,7 @@ export default function PlanDetail() {
   };
 
   const handleEditPlan = () => {
-    router.push(`/plan/${id}/duzenle`);
+    router.push(`/plan/${id}/edit`);
   };
 
   const handleDeletePlan = async () => {
