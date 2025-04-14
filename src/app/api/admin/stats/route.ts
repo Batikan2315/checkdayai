@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       recentActivities.push({
         title: "Yeni kullanıcı kaydoldu",
         description: `${user.firstName || user.username || user.email}`,
-        time: formatDistanceToNow(new Date(user.createdAt), { addSuffix: true, locale: tr })
+        time: formatDistanceToNow(new Date(user.createdAt || new Date()), { addSuffix: true, locale: tr })
       });
     }
     
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
       recentActivities.push({
         title: "Yeni plan oluşturuldu",
         description: `${plan.title} - ${plan.location || ""}`,
-        time: formatDistanceToNow(new Date(plan.createdAt), { addSuffix: true, locale: tr })
+        time: formatDistanceToNow(new Date(plan.createdAt || new Date()), { addSuffix: true, locale: tr })
       });
     }
     
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
                 transaction.type === "withdrawal" ? "Bakiye çekme" : 
                 "Para iadesi"}`,
         description: `${user ? (user.firstName || user.username) : "Kullanıcı"} - ${transaction.amount} ₺`,
-        time: formatDistanceToNow(new Date(transaction.createdAt), { addSuffix: true, locale: tr })
+        time: formatDistanceToNow(new Date(transaction.createdAt || new Date()), { addSuffix: true, locale: tr })
       });
     }
     
