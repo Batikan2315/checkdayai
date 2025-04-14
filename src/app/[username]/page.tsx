@@ -10,7 +10,8 @@ import { IPlan, IUser } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
 export default function UserProfile() {
-  const { username } = useParams();
+  const params = useParams();
+  const usernameParam = params?.username as string;
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<IUser | null>(null);
   const [plans, setPlans] = useState<IPlan[]>([]);
@@ -22,13 +23,12 @@ export default function UserProfile() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        if (!username) return;
+        if (!usernameParam) return;
         
         setLoading(true);
         // username parametresindeki @ işaretini kaldır ve küçük harfe dönüştür
-        const usernameStr = typeof username === 'string' ? username : Array.isArray(username) ? username[0] : '';
-        const cleanUsername = usernameStr.replace('@', '').toLowerCase();
-        console.log(`Parametre: ${usernameStr}, Temizlenmiş username: ${cleanUsername}`);
+        const cleanUsername = usernameParam.replace('@', '').toLowerCase();
+        console.log(`Parametre: ${usernameParam}, Temizlenmiş username: ${cleanUsername}`);
         
         // API uç noktasını kullanarak kullanıcı bilgilerini getir
         const response = await fetch(`/api/user/profile?username=${cleanUsername}`);
@@ -57,7 +57,7 @@ export default function UserProfile() {
     };
 
     fetchUserData();
-  }, [username]);
+  }, [usernameParam]);
 
   // Filtreleme işlevleri
   useEffect(() => {
