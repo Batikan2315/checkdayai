@@ -4,16 +4,9 @@ import Plan from '@/models/Plan';
 import mongoose from 'mongoose';
 import { isValidObjectId } from '@/lib/utils';
 
-// Next.js 15 route handler tipi
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
 export async function POST(
   req: NextRequest,
-  { params }: RouteParams
+  { params }: { params: { id: string } }
 ) {
   try {
     await connectDB();

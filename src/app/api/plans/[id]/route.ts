@@ -4,17 +4,10 @@ import Plan from '@/models/Plan';
 import mongoose from 'mongoose';
 import { safeStringify } from '@/lib/utils';
 
-// Next.js 15 route handler tipi
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
 // GET: Belirli bir planı getir
 export async function GET(
   req: NextRequest,
-  { params }: RouteParams
+  { params }: { params: { id: string } }
 ) {
   try {
     await connectDB();
@@ -57,7 +50,7 @@ export async function GET(
 // PATCH: Plan bilgilerini güncelle
 export async function PATCH(
   req: NextRequest,
-  { params }: RouteParams
+  { params }: { params: { id: string } }
 ) {
   try {
     await connectDB();
@@ -107,7 +100,7 @@ export async function PATCH(
 // DELETE: Planı sil
 export async function DELETE(
   req: NextRequest,
-  { params }: RouteParams
+  { params }: { params: { id: string } }
 ) {
   try {
     await connectDB();
