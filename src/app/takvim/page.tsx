@@ -249,26 +249,16 @@ export default function Calendar() {
         <div>
           <Card>
             <CardHeader>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {selectedDate ? formatDate(selectedDate) : "Seçili Gün Yok"}
-              </h2>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                {selectedDate ? formatDate(selectedDate) : "Seçili Gün"}
+              </h3>
             </CardHeader>
             <CardBody>
               {loading ? (
-                <div className="flex justify-center py-10">
-                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
-              ) : selectedDatePlans.length === 0 ? (
-                <div className="text-center py-8">
-                  <FaCalendarAlt className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
-                  <p className="text-gray-500 dark:text-gray-400">
-                    Bu tarihte planlanmış etkinlik yok
-                  </p>
-                  <Button href="/plan/olustur" className="mt-4">
-                    Yeni Plan Ekle
-                  </Button>
-                </div>
-              ) :
+              ) : selectedDatePlans.length > 0 ? (
                 <div className="space-y-4">
                   {selectedDatePlans.map((plan) => (
                     <PlanCard
@@ -277,7 +267,7 @@ export default function Calendar() {
                       title={plan.title}
                       description={plan.description}
                       date={new Date(plan.startDate)}
-                      location={plan.location}
+                      location={plan.location || (plan.isOnline ? "Online" : "Belirtilmemiş")}
                       imageUrl={plan.imageUrl}
                       creator={plan.creator}
                       isOnline={plan.isOnline}
@@ -285,17 +275,59 @@ export default function Calendar() {
                       price={plan.price}
                       maxParticipants={plan.maxParticipants}
                       participantCount={plan.participants?.length || 0}
-                      likes={plan.likes?.length || 0}
-                      saves={plan.saves?.length || 0}
-                      isJoined={true} // Takvimde gösterilen planlar zaten katılınan planlar
-                      onJoin={() => {}}
+                      isJoined={true}
                     />
                   ))}
                 </div>
-              }
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  {selectedDate ? "Bu tarihte planınız yok" : "Takvimden bir gün seçin"}
+                </div>
+              )}
             </CardBody>
           </Card>
         </div>
+      </div>
+      
+      {/* Yaklaşan Planlar Listesi */}
+      <div className="mt-8">
+        <Card>
+          <CardHeader>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Tüm Planlarım</h3>
+          </CardHeader>
+          <CardBody>
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+              </div>
+            ) : plans.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {plans.map((plan) => (
+                  <PlanCard
+                    key={plan._id}
+                    id={plan._id}
+                    title={plan.title}
+                    description={plan.description}
+                    date={new Date(plan.startDate)}
+                    location={plan.location || (plan.isOnline ? "Online" : "Belirtilmemiş")}
+                    imageUrl={plan.imageUrl}
+                    creator={plan.creator}
+                    isOnline={plan.isOnline}
+                    isFree={plan.isFree}
+                    price={plan.price}
+                    maxParticipants={plan.maxParticipants}
+                    participantCount={plan.participants?.length || 0}
+                    isJoined={true}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Henüz planınız yok
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </PageContainer>
   );

@@ -10,6 +10,7 @@ import PageContainer from "@/components/layout/PageContainer";
 import { getUserPlans, getUserSavedPlans, getUserTransactions, getUserLikedPlans, updateUserBalance } from "@/lib/actions";
 import { IPlan, ITransaction } from "@/lib/types";
 import { toast } from "react-hot-toast";
+import PlanCard from "@/components/ui/PlanCard";
 
 const NotificationSettingsLazy = lazy(() => import('@/components/settings/NotificationSettings'));
 
@@ -658,26 +659,28 @@ export default function Profile() {
     <div>
       <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Oluşturduğunuz Planlar</h2>
       {loading.plans ? (
-        <p>Yükleniyor...</p>
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
       ) : userPlans.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {userPlans.map(plan => (
-            <div
+            <PlanCard
               key={plan._id?.toString()}
-              className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
-            >
-              <h3 className="font-medium text-lg">{plan.title}</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{plan.description}</p>
-              <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400 text-sm">
-                  <FaCalendarAlt className="inline mr-1" />
-                  {formatDate(plan.startDate)}
-                </span>
-                <Button size="sm" onClick={() => router.push(`/plan/${plan._id}`)}>
-                  Detaylar
-                </Button>
-              </div>
-            </div>
+              id={plan._id?.toString() || ''}
+              title={plan.title || ''}
+              description={plan.description || ''}
+              date={new Date(plan.startDate || Date.now())}
+              location={plan.location || (plan.isOnline ? 'Online' : 'Belirtilmemiş')}
+              imageUrl={plan.imageUrl}
+              creator={plan.creator}
+              isOnline={plan.isOnline}
+              isFree={plan.isFree}
+              price={plan.price || 0}
+              maxParticipants={plan.maxParticipants || 0}
+              participantCount={plan.participants?.length || 0}
+              isJoined={true}
+            />
           ))}
         </div>
       ) : (
@@ -690,26 +693,28 @@ export default function Profile() {
     <div>
       <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Kaydettiğiniz Planlar</h2>
       {loading.savedPlans ? (
-        <p>Yükleniyor...</p>
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
       ) : savedPlans.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {savedPlans.map(plan => (
-            <div
+            <PlanCard
               key={plan._id?.toString()}
-              className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
-            >
-              <h3 className="font-medium text-lg">{plan.title}</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{plan.description}</p>
-              <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400 text-sm">
-                  <FaCalendarAlt className="inline mr-1" />
-                  {formatDate(plan.startDate)}
-                </span>
-                <Button size="sm" onClick={() => router.push(`/plan/${plan._id}`)}>
-                  Detaylar
-                </Button>
-              </div>
-            </div>
+              id={plan._id?.toString() || ''}
+              title={plan.title || ''}
+              description={plan.description || ''}
+              date={new Date(plan.startDate || Date.now())}
+              location={plan.location || (plan.isOnline ? 'Online' : 'Belirtilmemiş')}
+              imageUrl={plan.imageUrl}
+              creator={plan.creator}
+              isOnline={plan.isOnline}
+              isFree={plan.isFree}
+              price={plan.price || 0}
+              maxParticipants={plan.maxParticipants || 0}
+              participantCount={plan.participants?.length || 0}
+              isJoined={true}
+            />
           ))}
         </div>
       ) : (
@@ -722,26 +727,28 @@ export default function Profile() {
     <div>
       <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Beğendiğiniz Planlar</h2>
       {loading.likedPlans ? (
-        <p>Yükleniyor...</p>
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
       ) : likedPlans.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {likedPlans.map(plan => (
-            <div
+            <PlanCard
               key={plan._id?.toString()}
-              className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
-            >
-              <h3 className="font-medium text-lg">{plan.title}</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{plan.description}</p>
-              <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400 text-sm">
-                  <FaCalendarAlt className="inline mr-1" />
-                  {formatDate(plan.startDate)}
-                </span>
-                <Button size="sm" onClick={() => router.push(`/plan/${plan._id}`)}>
-                  Detaylar
-                </Button>
-              </div>
-            </div>
+              id={plan._id?.toString() || ''}
+              title={plan.title || ''}
+              description={plan.description || ''}
+              date={new Date(plan.startDate || Date.now())}
+              location={plan.location || (plan.isOnline ? 'Online' : 'Belirtilmemiş')}
+              imageUrl={plan.imageUrl}
+              creator={plan.creator}
+              isOnline={plan.isOnline}
+              isFree={plan.isFree}
+              price={plan.price || 0}
+              maxParticipants={plan.maxParticipants || 0}
+              participantCount={plan.participants?.length || 0}
+              isJoined={true}
+            />
           ))}
         </div>
       ) : (

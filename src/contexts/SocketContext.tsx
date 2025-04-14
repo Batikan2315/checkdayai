@@ -41,16 +41,25 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         
         // 3. Socket.io istemcisini oluştur
         console.log("WebSocket istemcisi başlatılıyor");
-        const socketInstance = io(window.location.origin, {
-          reconnectionAttempts: 1, // Sadece bir kez yeniden bağlanma denemesi yap
-          reconnectionDelay: 2000, // 2 saniye bekle
-          timeout: 5000, // 5 saniye timeout
-          transports: ["websocket"], // Sadece WebSocket, polling yok
+        
+        // WebSocket URL'ini çevre değişkeninden veya varsayılan olarak ayarla
+        const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
+        
+        const socketInstance = io(SOCKET_URL, {
+          reconnectionAttempts: 3,     // 3 kez yeniden bağlanma denemesi
+          reconnectionDelay: 5000,     // 5 saniye bekle
+          timeout: 10000,              // 10 saniye timeout
+          transports: ["websocket", "polling"], // WebSocket yoksa polling'e düş
           path: '/api/socketio/',
           auth: { userId: session.user.id },
-          forceNew: true, // Her seferinde yeni bağlantı aç
-          withCredentials: false, // Cookie kullanma
-          autoConnect: false // Manuel bağlanacağız
+          forceNew: true,              // Her seferinde yeni bağlantı aç
+          withCredentials: false,      // Cookie kullanma
+          autoConnect: false,          // Manuel bağlanacağız
+          upgrade: true,               // websocket'e yükseltmeye izin ver
+          rememberUpgrade: true,       // websocket tespitini hatırla
+          // Efektif polling aralığını ayarla
+          pingInterval: 15000,        // 15 saniyelik ping aralığı (daha az sunucu yükü)
+          pingTimeout: 10000          // 10 saniyelik ping timeout
         });
         
         // 4. Socket.io olay dinleyicilerini ayarla
@@ -68,16 +77,17 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
           setIsConnected(false);
           setConnectionError(`Bağlantı hatası: ${err.message}`);
           
-          // Bağlantı hatası durumunda WebSocket'i temizle
-          socketInstance.close();
+          // Bağlantı hatası durumunda polling'e düş
+          if (socketInstance.io.engine.transport.name === 'websocket') {
+            console.log("WebSocket kullanılamıyor, polling mekanizması devrede");
+            // Transport değiştirmeyi dene
+            socketInstance.io.engine.transport.close();
+          }
         });
         
         socketInstance.on("disconnect", () => {
           console.log("Socket bağlantısı kesildi");
           setIsConnected(false);
-          
-          // Bağlantı kesildikten sonra tekrar bağlanma denemesi yapma
-          // useNotifications polling mekanizması kullanacak
         });
         
         // 5. Bağlantıyı başlat

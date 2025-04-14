@@ -152,21 +152,21 @@ export default function Home() {
           <section className="text-center py-10 px-4 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl text-white">
             <h1 className="text-3xl md:text-4xl font-bold mb-4">Planlarını Keşfet</h1>
             <p className="text-lg mb-6 opacity-90 max-w-2xl mx-auto">
-              CheckDay ile hayatını planla, etkinliklere katıl veya kendi etkinliklerini oluştur.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link href="/plan/olustur">
-              <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50">
-                  <FaCalendarAlt className="mr-2" /> Plan Oluştur
+              CheckDay ile hayatını planla, planlara katıl veya kendi planlarını oluştur.
+            </p>
+            <div className="flex flex-wrap justify-center gap-4">
+              <Link href="/plan/olustur">
+                <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50">
+                    <FaCalendarAlt className="mr-2" /> Plan Oluştur
+                  </Button>
+                </Link>
+                <Link href="/planlar">
+                  <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
+                    <FaSearch className="mr-2" /> Planları Keşfet
                 </Button>
               </Link>
-              <Link href="/planlar">
-                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
-                  <FaSearch className="mr-2" /> Planları Keşfet
-              </Button>
-            </Link>
-            </div>
-          </section>
+              </div>
+            </section>
         )}
 
         {/* Özellikler Bölümü */}
@@ -199,7 +199,7 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-semibold mb-3 text-center">Konuma Göre Keşfet</h3>
               <p className="text-gray-600 dark:text-gray-300 text-center">
-                Bulunduğun bölgedeki etkinlikleri keşfet, yakınındaki planlar hakkında bildirimler al.
+                Bulunduğun bölgedeki planları keşfet, yakınındaki planlar hakkında bildirimler al.
               </p>
             </div>
           </div>
@@ -219,7 +219,7 @@ export default function Home() {
             </div>
             <div className="p-4">
               <div className="text-4xl font-bold mb-2">300+</div>
-              <div className="text-lg opacity-90">Başarılı Etkinlik</div>
+              <div className="text-lg opacity-90">Başarılı Plan</div>
             </div>
             <div className="p-4">
               <div className="text-4xl font-bold mb-2">50+</div>
@@ -275,11 +275,11 @@ export default function Home() {
           )}
         </section>
 
-        {/* Yaklaşan Etkinlikler Bölümü */}
+        {/* Yaklaşan Planlar Bölümü */}
         {plans && plans.length > 0 && (
           <section className="py-10">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold">Yaklaşan Etkinlikler</h2>
+              <h2 className="text-3xl font-bold">Yaklaşan Planlar</h2>
               <Link href="/planlar">
                 <Button variant="outline" className="gap-2">
                   Tümünü Gör <FaArrowRight />
@@ -336,7 +336,7 @@ export default function Home() {
               <div className="w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center text-2xl font-bold mb-4">2</div>
               <h3 className="text-xl font-semibold mb-2">Planını Oluştur</h3>
               <p className="text-gray-600">
-                Etkinlik, toplantı veya bireysel planlarını kolayca oluştur ve yönet.
+                Planları kolayca oluştur ve yönet.
               </p>
             </div>
             
@@ -344,7 +344,7 @@ export default function Home() {
               <div className="w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center text-2xl font-bold mb-4">3</div>
               <h3 className="text-xl font-semibold mb-2">Paylaş ve Katıl</h3>
               <p className="text-gray-600">
-                Planlarını arkadaşlarınla paylaş veya açık etkinliklere katıl.
+                Planlarını arkadaşlarınla paylaş veya açık planlara katıl.
               </p>
             </div>
           </div>
@@ -383,7 +383,7 @@ export default function Home() {
                   </div>
                 </div>
                 <p className="text-gray-600">
-                  "Etkinlikleri keşfetmek artık çok daha kolay. CheckDay'i herkese tavsiye ediyorum!"
+                  "Planları keşfetmek artık çok daha kolay. CheckDay'i herkese tavsiye ediyorum!"
                 </p>
               </CardBody>
             </Card>
@@ -413,7 +413,7 @@ export default function Home() {
             <div className="md:w-1/2 mb-6 md:mb-0">
               <h2 className="text-3xl font-bold mb-4">CheckDay'i Her Yerde Kullanın</h2>
               <p className="text-lg mb-6">
-                Mobil uygulamamızı indirin, planlarınızı her zaman yanınızda taşıyın. Bildirimlerle hiçbir etkinliği kaçırmayın.
+                Mobil uygulamamızı indirin, planlarınızı her zaman yanınızda taşıyın. Bildirimlerle hiçbir planı kaçırmayın.
               </p>
               <div className="flex flex-wrap gap-4">
                 <Button size="lg" className="bg-black text-white hover:bg-gray-800">
