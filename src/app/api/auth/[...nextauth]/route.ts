@@ -11,6 +11,17 @@ import { DefaultSession } from "next-auth";
 import { uploadProfileImage } from "@/lib/cloudinary";
 import axios from "axios";
 
+// Google profil tipini tanımla
+interface GoogleProfile {
+  email: string;
+  email_verified?: boolean;
+  name?: string;
+  picture?: string;
+  given_name?: string;
+  family_name?: string;
+  sub: string;
+}
+
 // Google'dan gelen resmi base64 formatına dönüştür
 const fetchImageAsBase64 = async (imageUrl: string): Promise<string | null> => {
   try {
@@ -143,7 +154,7 @@ declare module "next-auth/jwt" {
   }
 }
 
-export const authOptions: NextAuthOptions = {
+const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
@@ -251,198 +262,150 @@ export const authOptions: NextAuthOptions = {
           (session.user as any).provider = token.provider;
         }
         
-        // Veritabanından kullanıcı bilgilerini al
         try {
           await connectDB();
-          
-          // Google/OAuth kullanıcıları için ObjectId hatasını önlemek için
-          // doğrudan oauth_id ile kullanıcıyı buluyoruz
-          let query = {};
+          let dbUser;
           
           if (token.oauth_id) {
-            // OAuth kimliği varsa, önce onunla arayalım
-            query = { oauth_id: token.oauth_id };
-            console.log("OAuth ID ile kullanıcı aranıyor:", token.oauth_id);
-          } else if (token.id && token.id.length === 24 && /^[0-9a-fA-F]{24}$/.test(token.id)) {
-            // ID, MongoDB ObjectID formatında ise (_id olarak arayabiliriz)
-            query = { _id: token.id };
-            console.log("MongoDB ID (_id) ile kullanıcı aranıyor:", token.id);
-          } else {
-            // Diğer durumlar için email ile arama yapalım
-            query = { email: session.user.email };
-            console.log("E-posta ile kullanıcı aranıyor:", session.user.email);
+            dbUser = await User.findOne({ oauth_id: token.oauth_id });
+          } else if (token.email) {
+            dbUser = await User.findOne({ email: token.email });
           }
           
-          console.log("Kullanıcı bulma sorgusu:", query);
-          const dbUser = await User.findOne(query);
-          
           if (dbUser) {
-            console.log("Kullanıcı bulundu, session güncelleniyor");
-            // Veritabanından gelen bilgileri session'a ekle
-            session.user.name = dbUser.firstName && dbUser.lastName 
-              ? `${dbUser.firstName} ${dbUser.lastName}`.trim() 
-              : dbUser.username;
-            
             // Kullanıcı adını ekle
             (session.user as any).username = dbUser.username;
             
-            // Diğer bilgileri ekle
-            (session.user as any).firstName = dbUser.firstName || '';
-            (session.user as any).lastName = dbUser.lastName || '';
-            (session.user as any).balance = dbUser.balance || 0;
+            // Ad ve soyadı ekle
+            (session.user as any).firstName = dbUser.firstName;
+            (session.user as any).lastName = dbUser.lastName;
             
-            // _id değerini OAuth ID'si yerine MongoDB _id olarak ayarla
-            session.user.id = dbUser._id.toString();
+            // Bakiye ekle
+            (session.user as any).balance = dbUser.balance;
             
-            // Profil resmini güncelle
-            if (dbUser.profilePicture) {
-              session.user.image = dbUser.profilePicture;
+            // Profil resmini ekle (son cache busting için yeni timestamp ekle)
+            const profilePicUrl = dbUser.profilePicture;
+            if (profilePicUrl) {
+              (session.user as any).profilePicture = profilePicUrl.includes('?') 
+                ? profilePicUrl.split('?')[0] + `?t=${Date.now()}`
+                : profilePicUrl + `?t=${Date.now()}`;
             }
-          } else {
-            console.log("Kullanıcı bulunamadı, session bilgileri varsayılan olarak bırakıldı");
           }
         } catch (error) {
-          console.error("Session callback db hatası:", error);
+          console.error("SESSION - Kullanıcı veri alınamadı:", error);
         }
       }
       
+      console.log("SESSION - Güncel oturum:", session);
       return session;
     },
     async signIn({ user, account, profile }) {
-      try {
-        console.log("Sign in callback çalışıyor. Provider:", account?.provider);
-        
-        if (!user || !account || !profile) {
-          console.error("Kullanıcı veya hesap bilgileri eksik.");
-          return false;
-        }
-        
-        if (account.provider === "google") {
-          const googleProfile = profile as any;
-          console.log("Google ile giriş yapan kullanıcı:", googleProfile.email);
-          
+      // Google ile giriş yapıldığında
+      if (account?.provider === 'google' && profile) {
+        try {
           await connectDB();
           
-          // Kullanıcı zaten var mı diye kontrol et
-          const existingUser = await User.findOne({ email: googleProfile.email });
+          // Google profil nesnesini uygun tip ile işle
+          const googleProfile = profile as GoogleProfile;
+          
+          // Kullanıcı adı oluşturmak için ismi kullan
+          const name = googleProfile.name || 'user';
+          
+          // Google OAuth ID'si ile kullanıcı var mı kontrol et
+          let existingUser = await User.findOne({ oauth_id: googleProfile.sub });
+          
+          // OAuth ID ile kullanıcı bulunamadıysa e-posta ile de kontrol et
+          if (!existingUser && googleProfile.email) {
+            existingUser = await User.findOne({ email: googleProfile.email });
+          }
           
           if (existingUser) {
-            console.log("Kullanıcı zaten var, profil güncelleniyor");
+            // Kullanıcı zaten varsa, OAuth bilgilerini güncelle
+            existingUser.oauth_id = existingUser.oauth_id || googleProfile.sub;
+            existingUser.provider = existingUser.provider || 'google';
             
-            // OAuth ID'sini güncelle
-            existingUser.oauth_id = profile.sub || googleProfile.sub;
-            
-            // Profil resmini ve diğer bilgileri güncelle
-            if (googleProfile.picture && (!existingUser.profilePicture || existingUser.profilePicture.includes("default"))) {
-              try {
-                // Optimize edilmiş profil resmi al
-                const optimizedImage = await getOptimizedProfilePicture(
-                  googleProfile.picture,
-                  existingUser._id.toString()
-                );
-                existingUser.profilePicture = optimizedImage;
-                console.log("Profil resmi optimize edildi ve önbellekleme sorunları giderildi");
-              } catch (imageError) {
-                console.error("Profil resmi işlenirken hata:", imageError);
-                // Hata durumunda doğrudan Google URL'sini kaydet (önbellek bypass ile)
-                existingUser.profilePicture = googleProfile.picture + `?t=${Date.now()}`;
-              }
+            // E-posta doğrulamasını otomatik olarak tamamla
+            if (!existingUser.isVerified) {
+              existingUser.isVerified = true;
+              existingUser.verificationToken = undefined;
+              existingUser.verificationExpires = undefined;
             }
             
-            if (googleProfile.name && !existingUser.firstName) {
-              // Türkçe karakterleri düzgün şekilde kaydedelim
-              existingUser.firstName = googleProfile.name;
+            // Profil resmi güncelleme işlemi
+            if (googleProfile.picture && typeof googleProfile.picture === 'string') {
+              // Google profil resmini optimize et ve Cloudinary'ye yükle
+              const optimizedProfilePic = await getOptimizedProfilePicture(
+                googleProfile.picture,
+                existingUser._id.toString(),
+                existingUser.profilePicture
+              );
+              
+              existingUser.profilePicture = optimizedProfilePic;
             }
             
-            // Google'dan gelen provider bilgisini de ekleyelim
-            existingUser.provider = "google";
+            // Ad-soyad bilgilerini güncelle (eğer boşsa)
+            if (!existingUser.firstName && googleProfile.given_name) {
+              existingUser.firstName = googleProfile.given_name;
+            }
+            if (!existingUser.lastName && googleProfile.family_name) {
+              existingUser.lastName = googleProfile.family_name;
+            }
             
-            console.log("Kullanıcı güncellemesi:", existingUser);
             await existingUser.save();
-            
-            return true;
+            console.log("Mevcut kullanıcı güncellendi (Google):", existingUser.email);
           } else {
-            console.log("Yeni kullanıcı oluşturuluyor");
-            
             // Benzersiz kullanıcı adı oluştur
-            const username = await generateUniqueUsername(googleProfile.name || googleProfile.email);
-            console.log("Oluşturulan kullanıcı adı:", username);
-            
-            // İsim alanında Türkçe karakterleri koruyalım
-            const firstName = googleProfile.name || googleProfile.given_name || '';
-            const lastName = googleProfile.family_name || '';
-            
-            // Profil resmi için varsayılan değer
-            let profilePicture = '/images/avatars/default.png';
-            
-            // Google profil resmini işle (varsa)
-            if (googleProfile.picture) {
-              try {
-                // Optimize edilmiş profil resmi al (yeni kullanıcı için henüz ID yok, oluşturulduktan sonra güncelle)
-                profilePicture = googleProfile.picture + `?t=${Date.now()}`; // Geçici olarak Google URL'sini kullan
-              } catch (imageError) {
-                console.error("Profil resmi işlenirken hata:", imageError);
-                // Hata durumunda varsayılan resmi kullan
-              }
-            }
+            const username = await generateUniqueUsername(name);
             
             // Yeni kullanıcı oluştur
-            const newUser = await User.create({
+            const newUser = new User({
               email: googleProfile.email,
-              username,
-              password: crypto.randomBytes(16).toString('hex'), // Rastgele şifre oluştur
-              firstName: firstName,
-              lastName: lastName,
-              isVerified: googleProfile.email_verified || true,
-              profilePicture: profilePicture,
-              role: 'user',
-              oauth_id: profile.sub || googleProfile.sub,
-              provider: account.provider
+              firstName: googleProfile.given_name || "",
+              lastName: googleProfile.family_name || "",
+              username: username,
+              isVerified: true, // Google hesabı doğrulanmış kabul edilir
+              oauth_id: googleProfile.sub, // Google tarafından verilen kimlik
+              provider: 'google',
+              role: "user",
             });
             
-            console.log("Yeni kullanıcı oluşturuldu:", newUser._id);
-            
-            // Eğer Google profil resmi varsa, kullanıcı oluşturulduktan sonra
-            // Cloudinary'ye optimize edilmiş şekilde yükle
-            if (googleProfile.picture) {
-              try {
-                // Şimdi optimize edilmiş profil resmini alalım (kullanıcı ID'si mevcut)
-                const optimizedImage = await getOptimizedProfilePicture(
-                  googleProfile.picture,
-                  newUser._id.toString()
-                );
-                
-                // Kullanıcı profil resmini güncelle
-                await User.findByIdAndUpdate(newUser._id, { profilePicture: optimizedImage });
-                console.log("Yeni kullanıcının profil resmi optimize edildi");
-              } catch (imageError) {
-                console.error("Yeni kullanıcı profil resmi işlenirken hata:", imageError);
-                // Hata durumunda herhangi bir işlem yapma, varsayılan Google URL'si kalacak
-              }
+            // Profil resmi ekleme
+            if (googleProfile.picture && typeof googleProfile.picture === 'string') {
+              // Google profil resmini optimize et ve Cloudinary'ye yükle
+              const optimizedProfilePic = await getOptimizedProfilePicture(
+                googleProfile.picture,
+                newUser._id.toString()
+              );
+              
+              newUser.profilePicture = optimizedProfilePic;
             }
             
-            return true;
+            await newUser.save();
+            console.log("Yeni Google kullanıcısı oluşturuldu:", newUser.email);
           }
+          
+          return true;
+        } catch (error) {
+          console.error("Google ile giriş hatası:", error);
+          return false;
         }
-        
-        return true;
-      } catch (error) {
-        console.error("Giriş hatası:", error);
-        return false;
       }
-    },
-  },
-  pages: {
-    signIn: "/giris",
-    error: "/giris",
+      
+      return true;
+    }
   },
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 gün
   },
   secret: process.env.NEXTAUTH_SECRET,
+  pages: {
+    signIn: "/giris",
+    error: "/giris?error=AuthError",
+  },
   debug: process.env.NODE_ENV === "development",
 };
 
 const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST }; 
+
+export { handler as GET, handler as POST } 
