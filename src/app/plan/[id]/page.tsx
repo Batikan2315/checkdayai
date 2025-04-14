@@ -462,6 +462,10 @@ export default function PlanDetail() {
   // Plan saatinin geçip geçmediğini kontrol et
   const isPlanPast = new Date(plan.endDate) < new Date();
   
+  // Kullanıcının plana katılıp katılmadığını veya planın sahibi olup olmadığını kontrol et
+  const showJoinButton = !isCreator && !hasJoined && !isPlanPast;
+  const showLeaveButton = hasJoined && !isCreator && !isPlanPast;
+  
   return (
     <div className="container mx-auto py-8">
       <Card className="overflow-hidden">
@@ -597,7 +601,7 @@ export default function PlanDetail() {
                   <FaTrash className="mr-2" /> Sil
                 </Button>
               </div>
-            ) : hasJoined ? (
+            ) : showLeaveButton ? (
               <Button 
                 onClick={handleLeave} 
                 disabled={leaving || isPlanPast}
@@ -644,15 +648,17 @@ export default function PlanDetail() {
           ) : !hasJoined && !canEdit ? (
             <div className="text-center py-8 bg-gray-50 rounded-lg">
               <p className="text-gray-600 mb-3">Plan odasını ve mesajları görebilmek için plana katılmalısınız.</p>
-              <Button 
-                onClick={handleJoin} 
-                disabled={joining}
-                loading={joining}
-                size="md"
-                className="mt-2"
-              >
-                Plana Katıl
-              </Button>
+              {showJoinButton && (
+                <Button 
+                  onClick={handleJoin} 
+                  disabled={joining}
+                  loading={joining}
+                  size="md"
+                  className="mt-2"
+                >
+                  Plana Katıl
+                </Button>
+              )}
             </div>
           ) : (
             <>
