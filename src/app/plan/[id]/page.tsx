@@ -349,6 +349,36 @@ export default function PlanDetail() {
     toast.success("Lider ekleme özelliği yakında eklenecek");
   };
 
+  // Kullanıcının plana zaten katılıp katılmadığını kontrol et
+  const hasJoined = userId && plan.participants?.some((p: any) => 
+    p._id === userId || p === userId
+  );
+  
+  // Kullanıcının plan sahibi olup olmadığını kontrol et
+  const isCreator = userId && (
+    plan.creator?._id === userId || 
+    plan.creator === userId || 
+    plan.oauth_creator_id === userId
+  );
+  
+  // Kullanıcının plan lideri olup olmadığını kontrol et
+  const isLeader = userId && plan.leaders?.some((leader: any) => {
+    if (typeof leader === 'object') {
+      return leader._id === userId;
+    }
+    return leader === userId;
+  });
+  
+  // Kullanıcının düzenleme yetkisi var mı (oluşturucu veya lider)
+  const canEdit = isCreator || isLeader;
+  
+  // Plan saatinin geçip geçmediğini kontrol et
+  const isPlanPast = new Date(plan.endDate) < new Date();
+  
+  // Kullanıcının plana katılıp katılmadığını veya planın sahibi olup olmadığını kontrol et
+  const showJoinButton = !isCreator && !hasJoined && !isPlanPast;
+  const showLeaveButton = hasJoined && !isCreator && !isPlanPast;
+  
   // Liderler bilgilerini gösterme
   const renderLeadersInfo = useMemo(() => {
     if (!plan || !plan.leaders || !Array.isArray(plan.leaders) || plan.leaders.length === 0) return null;
@@ -436,36 +466,6 @@ export default function PlanDetail() {
     );
   }
 
-  // Kullanıcının plana zaten katılıp katılmadığını kontrol et
-  const hasJoined = userId && plan.participants?.some((p: any) => 
-    p._id === userId || p === userId
-  );
-  
-  // Kullanıcının plan sahibi olup olmadığını kontrol et
-  const isCreator = userId && (
-    plan.creator?._id === userId || 
-    plan.creator === userId || 
-    plan.oauth_creator_id === userId
-  );
-  
-  // Kullanıcının plan lideri olup olmadığını kontrol et
-  const isLeader = userId && plan.leaders?.some((leader: any) => {
-    if (typeof leader === 'object') {
-      return leader._id === userId;
-    }
-    return leader === userId;
-  });
-  
-  // Kullanıcının düzenleme yetkisi var mı (oluşturucu veya lider)
-  const canEdit = isCreator || isLeader;
-  
-  // Plan saatinin geçip geçmediğini kontrol et
-  const isPlanPast = new Date(plan.endDate) < new Date();
-  
-  // Kullanıcının plana katılıp katılmadığını veya planın sahibi olup olmadığını kontrol et
-  const showJoinButton = !isCreator && !hasJoined && !isPlanPast;
-  const showLeaveButton = hasJoined && !isCreator && !isPlanPast;
-  
   return (
     <div className="container mx-auto py-8">
       <Card className="overflow-hidden">

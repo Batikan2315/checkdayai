@@ -1,11 +1,9 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { IUser } from './User';
-import { IPlan } from './Plan';
 
 export interface IMessage extends Document {
-  planId: mongoose.Types.ObjectId | IPlan;
-  userId: mongoose.Types.ObjectId | IUser;
-  content: string;
+  planId: mongoose.Types.ObjectId | string;
+  sender: mongoose.Types.ObjectId | string;
+  text: string;
   createdAt: Date;
 }
 
@@ -16,17 +14,19 @@ const MessageSchema = new Schema<IMessage>(
       ref: 'Plan',
       required: true,
     },
-    userId: {
+    sender: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
-    content: {
+    text: {
       type: String,
-      required: [true, 'Mesaj içeriği zorunludur'],
+      required: [true, 'Mesaj metni zorunludur'],
       trim: true,
-      minlength: [1, 'Mesaj içeriği boş olamaz'],
-      maxlength: [1000, 'Mesaj içeriği en fazla 1000 karakter olabilir'],
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
     },
   },
   {
