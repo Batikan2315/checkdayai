@@ -72,30 +72,37 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  // Planları getir
+  // Rastgele planları getir
   useEffect(() => {
-    const fetchPlans = async () => {
+    const fetchRandomPlans = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/plans?limit=6&sort=createdAt&order=desc&published=true');
+        // Her seferinde farklı planlar getirmek için timestamp ekleyelim
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/plans?limit=10&published=true&_t=${timestamp}`);
         const data = await response.json();
         
         console.log("API yanıtı:", data); // Debug için yanıtı konsola yazdır
         
-        if (data && data.plans) {
-          setPlans(data.plans);
+        if (data && data.plans && data.plans.length > 0) {
+          // Planları karıştır ve rastgele 3 tanesini al
+          const shuffledPlans = [...data.plans].sort(() => 0.5 - Math.random());
+          const randomPlans = shuffledPlans.slice(0, 3);
+          setPlans(randomPlans);
         } else {
           console.error("Planlar için boş veya beklenmeyen API yanıtı:", data);
+          setPlans([]);
         }
       } catch (error) {
         console.error("Planları getirme hatası:", error);
         toast.error("Planlar yüklenirken bir hata oluştu");
+        setPlans([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPlans();
+    fetchRandomPlans();
   }, []);
 
   return (
@@ -235,10 +242,10 @@ export default function Home() {
           </div>
         </section>
         
-        {/* Son Planlar Bölümü */}
+        {/* Rastgele Planlar Bölümü */}
         <section className="py-10">
           <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl font-bold">Son Eklenen Planlar</h2>
+            <h2 className="text-3xl font-bold">Keşfedilecek Planlar</h2>
             <Link href="/plans">
               <Button variant="ghost" className="text-blue-600">
                 Tümünü Gör
@@ -251,7 +258,7 @@ export default function Home() {
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
           ) : plans && plans.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-3 gap-6">
               {plans.map((plan) => (
                 <PlanCard
                   key={plan._id}
@@ -274,35 +281,6 @@ export default function Home() {
             </div>
           )}
         </section>
-
-        {/* Yaklaşan Planlar Bölümü */}
-        {plans && plans.length > 0 && (
-          <section className="py-10">
-          <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold">Yaklaşan Planlar</h2>
-              <Link href="/plans">
-                <Button variant="outline" className="gap-2">
-                  Tümünü Gör <FaArrowRight />
-                </Button>
-            </Link>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.slice(0, 3).map((plan) => (
-                <PlanCard
-                  key={plan._id}
-                  id={plan._id}
-                  title={plan.title || "İsimsiz Plan"}
-                  description={plan.description || "Açıklama yok"}
-                  imageUrl={plan.image}
-                  date={new Date(plan.startDate || Date.now())}
-                  location={plan.location || "Konum belirtilmemiş"}
-                  creator={plan.creator}
-                />
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* CTA Bölümü */}
         <section className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-10 text-white text-center my-12">
