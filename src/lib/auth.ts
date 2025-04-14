@@ -109,7 +109,7 @@ export const authOptions: NextAuthOptions = {
       console.log("Session callback - token:", token);
       
       if (token) {
-        if (!session.user) session.user = {};
+        if (!session.user) session.user = { id: '', role: '' };
         
         session.user.id = token.id as string;
         session.user.email = token.email as string;
