@@ -39,11 +39,11 @@ export async function POST(req: NextRequest) {
     }
     
     // Zaten katılmış mı kontrol et
-    const isParticipant = plan.participants.some(
+    const isParticipant = plan.participants?.some(
       (participantId: any) => 
         participantId.toString() === userId || 
         participantId === userId
-    );
+    ) || false;
     
     if (isParticipant) {
       return NextResponse.json(
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Plan kapasitesi dolmuş mu kontrol et
-    if (plan.maxParticipants > 0 && plan.participants.length >= plan.maxParticipants) {
+    if (plan.maxParticipants > 0 && (plan.participants?.length || 0) >= plan.maxParticipants) {
       return NextResponse.json(
         { error: 'Plan kapasitesi dolmuş, katılım alınamıyor' }, 
         { status: 400 }
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     
     return NextResponse.json({ 
       message: 'Plana başarıyla katıldınız', 
-      participantCount: plan.participants.length + 1
+      participantCount: (plan.participants?.length || 0) + 1
     });
     
   } catch (error: any) {

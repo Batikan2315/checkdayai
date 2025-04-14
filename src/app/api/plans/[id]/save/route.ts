@@ -40,14 +40,14 @@ export async function POST(req: NextRequest) {
     // Kaydet veya kaldır işlemi
     if (action === 'save') {
       // Kullanıcı ID'si zaten saves array'inde var mı kontrol et
-      const alreadySaved = plan.saves.some(
+      const alreadySaved = plan.saves?.some(
         (save: any) => save.toString() === userId || save === userId
-      );
+      ) || false;
       
       if (alreadySaved) {
         return NextResponse.json({ 
           message: 'Plan zaten kaydedilmiş', 
-          saves: plan.saves.length
+          saves: plan.saves?.length || 0
         });
       }
       
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       
       return NextResponse.json({ 
         message: 'Plan kaydedildi', 
-        saves: plan.saves.length + 1
+        saves: (plan.saves?.length || 0) + 1
       });
     } else if (action === 'unsave') {
       // Plan'dan save kaldır
@@ -72,13 +72,13 @@ export async function POST(req: NextRequest) {
       );
       
       // Kullanıcının planı kaydetmiş mi kontrol et
-      const userSaved = plan.saves.some(
+      const userSaved = plan.saves?.some(
         (save: any) => save.toString() === userId || save === userId
-      );
+      ) || false;
       
       return NextResponse.json({ 
         message: 'Kayıt kaldırıldı', 
-        saves: userSaved ? plan.saves.length - 1 : plan.saves.length
+        saves: userSaved ? (plan.saves?.length || 0) - 1 : (plan.saves?.length || 0)
       });
     } else {
       return NextResponse.json({ error: 'Geçersiz işlem' }, { status: 400 });

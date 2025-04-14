@@ -71,7 +71,8 @@ export async function POST(req: NextRequest) {
       try {
         // Plan participants array'den userId'yi çıkar
         if (plan.participants && Array.isArray(plan.participants)) {
-          plan.participants = plan.participants.filter((id: any) => 
+          // any tipine dönüştürerek filtreleyelim
+          plan.participants = (plan.participants as any[]).filter((id: any) => 
             id !== userId.toString() && (!id || !id.toString || id.toString() !== userId.toString())
           );
         }

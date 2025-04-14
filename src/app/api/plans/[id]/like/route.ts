@@ -40,14 +40,14 @@ export async function POST(req: NextRequest) {
     // Like veya unlike işlemi
     if (action === 'like') {
       // Kullanıcı ID'si zaten likes array'inde var mı kontrol et
-      const alreadyLiked = plan.likes.some(
+      const alreadyLiked = plan.likes?.some(
         (like: any) => like.toString() === userId || like === userId
-      );
+      ) || false;
       
       if (alreadyLiked) {
         return NextResponse.json({ 
           message: 'Plan zaten beğenilmiş', 
-          likes: plan.likes.length
+          likes: plan.likes?.length || 0
         });
       }
       
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       
       return NextResponse.json({ 
         message: 'Plan beğenildi', 
-        likes: plan.likes.length + 1
+        likes: (plan.likes?.length || 0) + 1
       });
     } else if (action === 'unlike') {
       // Plan'dan like kaldır
@@ -72,13 +72,13 @@ export async function POST(req: NextRequest) {
       );
       
       // Kullanıcının planı beğenip beğenmediğini kontrol et
-      const userLiked = plan.likes.some(
+      const userLiked = plan.likes?.some(
         (like: any) => like.toString() === userId || like === userId
-      );
+      ) || false;
       
       return NextResponse.json({ 
         message: 'Beğeni kaldırıldı', 
-        likes: userLiked ? plan.likes.length - 1 : plan.likes.length
+        likes: userLiked ? (plan.likes?.length || 0) - 1 : (plan.likes?.length || 0)
       });
     } else {
       return NextResponse.json({ error: 'Geçersiz işlem' }, { status: 400 });
