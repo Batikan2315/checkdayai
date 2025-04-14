@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, ObjectId } from 'mongoose';
 import { IUser } from './User';
 
 export interface IPlan extends Document {
-  _id?: ObjectId;
+  _id: ObjectId;
   title: string;
   description: string;
   imageUrl?: string;
@@ -147,22 +147,22 @@ PlanSchema.pre('save', function(next) {
 
 // Sanal alan - beğeni sayısı
 PlanSchema.virtual("likeCount").get(function (this: IPlan) {
-  return this.likes?.length || 0;
+  return this.likes ? this.likes.length : 0;
 });
 
 // Sanal alan - kaydetme sayısı
 PlanSchema.virtual("saveCount").get(function (this: IPlan) {
-  return this.saves?.length || 0;
+  return this.saves ? this.saves.length : 0;
 });
 
 // Sanal alan - katılımcı sayısı
 PlanSchema.virtual("participantCount").get(function (this: IPlan) {
-  return this.participants?.length || 0;
+  return this.participants ? this.participants.length : 0;
 });
 
 // Sanal alan - lider sayısı
 PlanSchema.virtual("leaderCount").get(function (this: IPlan) {
-  return this.leaders?.length || 0;
+  return this.leaders ? this.leaders.length : 0;
 });
 
 // JSON dönüşümünde sanal alanları dahil et
