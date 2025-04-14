@@ -93,17 +93,17 @@ const Navbar: React.FC = () => {
   const menuItems = [
     {
       name: "Planlar",
-      href: "/planlar",
+      href: "/plans",
       icon: <FaBookmark className="w-6 h-6" />,
     },
     {
       name: "Takvim",
-      href: "/takvim",
+      href: "/calendar",
       icon: <FaCalendarAlt className="w-6 h-6" />,
     },
     {
       name: "Plan Oluştur",
-      href: "/plan/olustur",
+      href: "/plan/create",
       icon: <FaPlusCircle className="w-6 h-6" />,
     },
     {
@@ -114,7 +114,7 @@ const Navbar: React.FC = () => {
     },
     {
       name: "Profil",
-      href: session ? "/profil" : "/giris",
+      href: session ? "/profile" : "/login",
       icon: <FaUserCircle className="w-6 h-6" />,
     },
   ];
@@ -345,10 +345,10 @@ const Navbar: React.FC = () => {
             <div className="flex items-center space-x-4">
               {session && renderNotificationButton()}
               <Link
-                href={session ? "/profil" : "/giris"}
+                href={session ? "/profile" : "/login"}
                 className={twMerge(
                   "flex items-center px-3 py-2 rounded-md text-sm font-medium",
-                  pathname === (session ? "/profil" : "/giris")
+                  pathname === (session ? "/profile" : "/login")
                     ? "bg-blue-100 text-blue-600 dark:bg-gray-700 dark:text-blue-400"
                     : "text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 )}

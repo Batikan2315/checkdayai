@@ -134,12 +134,12 @@ export default function Home() {
                 </div>
                 
                 <div className="mt-8 flex flex-wrap justify-center gap-4">
-                  <Link href="/plan/olustur">
+                  <Link href="/plan/create">
                     <Button size="lg" className="bg-white text-purple-600 hover:bg-purple-50">
                       <FaCalendarAlt className="mr-2" /> Plan Oluştur
                     </Button>
                   </Link>
-                  <Link href="/planlar">
+                  <Link href="/plans">
                     <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
                       <FaSearch className="mr-2" /> Planları Keşfet
                     </Button>
@@ -155,12 +155,12 @@ export default function Home() {
               CheckDay ile hayatını planla, planlara katıl veya kendi planlarını oluştur.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/plan/olustur">
+              <Link href="/plan/create">
                 <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50">
                     <FaCalendarAlt className="mr-2" /> Plan Oluştur
                   </Button>
                 </Link>
-                <Link href="/planlar">
+                <Link href="/plans">
                   <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
                     <FaSearch className="mr-2" /> Planları Keşfet
                 </Button>
@@ -227,7 +227,7 @@ export default function Home() {
             </div>
           </div>
           <div className="mt-10 text-center">
-            <Link href="/planlar">
+            <Link href="/plans">
               <Button size="lg" className="bg-white text-indigo-600 hover:bg-blue-50">
                 <FaSearch className="mr-2" /> Planları Keşfet
               </Button>
@@ -239,7 +239,7 @@ export default function Home() {
         <section className="py-10">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-3xl font-bold">Son Eklenen Planlar</h2>
-            <Link href="/planlar">
+            <Link href="/plans">
               <Button variant="ghost" className="text-blue-600">
                 Tümünü Gör
               </Button>
@@ -268,7 +268,7 @@ export default function Home() {
           ) : (
             <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
               <p className="text-xl">Henüz plan bulunamadı. İlk planı oluşturmak ister misiniz?</p>
-              <Link href="/plan/olustur" className="mt-4 inline-block">
+              <Link href="/plan/create" className="mt-4 inline-block">
                 <Button>Plan Oluştur</Button>
               </Link>
             </div>
@@ -280,7 +280,7 @@ export default function Home() {
           <section className="py-10">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-3xl font-bold">Yaklaşan Planlar</h2>
-              <Link href="/planlar">
+              <Link href="/plans">
                 <Button variant="outline" className="gap-2">
                   Tümünü Gör <FaArrowRight />
                 </Button>

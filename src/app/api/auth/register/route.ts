@@ -7,11 +7,15 @@ import bcryptjs from "bcryptjs";
 
 // Sistem tarafından rezerve edilmiş kullanıcı adları
 const RESERVED_USERNAMES = [
-  'admin', 'planlar', 'takvim', 'profil', 'api', 'giris', 'kayit', 'plan', 'ai-check',
-  'about', 'login', 'register', 'help', 'support', 'contact', 'terms', 'privacy',
+  // İngilizce URL'ler
+  'admin', 'plans', 'calendar', 'profile', 'api', 'login', 'register', 'plan', 'ai-check',
+  'about', 'help', 'support', 'contact', 'terms', 'privacy',
   'settings', 'notifications', 'messages', 'search', 'explore', 'home', 'trending',
   'checkday', 'app', 'dashboard', 'user', 'users', 'account', 'accounts', 'auth',
-  'static', 'assets', 'public', 'images', 'js', 'css', 'sifremi-sifirla'
+  'static', 'assets', 'public', 'images', 'js', 'css', 'reset-password',
+  
+  // Türkçe karşılıkları (geçici olarak hem İngilizce hem Türkçe korunacak)
+  'planlar', 'takvim', 'profil', 'giris', 'kayit', 'sifremi-sifirla'
 ];
 
 // E-posta gönderme fonksiyonu
