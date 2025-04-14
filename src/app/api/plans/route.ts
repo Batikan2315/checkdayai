@@ -287,6 +287,29 @@ export async function POST(req: NextRequest) {
       console.log("Plan oluşturuldu:", newPlan._id);
     }
     
+    // Oluşturucuyu katılımcı olarak ekleyelim
+    await Plan.findByIdAndUpdate(
+      newPlan._id,
+      { $addToSet: { participants: body.creator } }
+    );
+    
+    // Kullanıcının katıldığı planlara da ekleyelim
+    if (isValidObjectId(body.creator)) {
+      await User.findByIdAndUpdate(
+        body.creator,
+        { $addToSet: { participatingPlans: newPlan._id } }
+      );
+    } else {
+      // Google ID için kullanıcıyı bul
+      const user = await User.findOne({ oauth_id: body.creator });
+      if (user) {
+        await User.findByIdAndUpdate(
+          user._id,
+          { $addToSet: { participatingPlans: newPlan._id } }
+        );
+      }
+    }
+    
     // Önbelleği temizle - yeni veri eklendi
     clearCache();
     

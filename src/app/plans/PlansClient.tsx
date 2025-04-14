@@ -301,6 +301,7 @@ export default function PlansClient() {
               participantCount={plan.participants?.length || 0}
               likes={plan.likes?.length || 0}
               saves={plan.saves?.length || 0}
+              isJoined={plan.participants?.includes(plan.creator) || false}
             />
           ))}
         </div>
