@@ -5,15 +5,14 @@ import User from '@/models/User';
 import mongoose from 'mongoose';
 import { isValidObjectId } from '@/lib/utils';
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(req: NextRequest) {
   try {
     await connectDB();
     
-    // params bir Promise değil, doğrudan erişilebilir
-    const { id } = params;
+    // URL'den ID'yi al
+    const url = new URL(req.url);
+    const segments = url.pathname.split('/');
+    const id = segments[segments.length - 2]; // /api/plans/[id]/join formatında
     
     // Body'den kullanıcı ID'sini al
     const body = await req.json();

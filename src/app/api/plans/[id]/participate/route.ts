@@ -4,15 +4,14 @@ import Plan from '@/models/Plan';
 import User from '@/models/User';
 import { isValidObjectId } from '@/lib/utils';
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(req: NextRequest) {
   try {
     await connectDB();
     
-    // params bir Promise değil, doğrudan erişilebilir
-    const { id: planId } = params;
+    // URL'den ID'yi al
+    const url = new URL(req.url);
+    const segments = url.pathname.split('/');
+    const planId = segments[segments.length - 2]; // /api/plans/[id]/participate formatında
     
     const body = await req.json();
     const { userId, action } = body;
