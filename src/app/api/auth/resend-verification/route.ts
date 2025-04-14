@@ -19,7 +19,7 @@ async function sendVerificationEmail(email: string, token: string) {
 
   // E-posta içeriği
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: `"CheckDay" <${process.env.EMAIL_USER}>`,
     to: email,
     subject: "CheckDay - E-posta Doğrulama",
     html: `

@@ -25,7 +25,7 @@ async function sendPasswordResetEmail(email: string, token: string) {
 
     // E-posta içeriği
     const mailOptions = {
-      from: process.env.EMAIL_USER || "destek@checkday.ai",
+      from: `"CheckDay" <${process.env.EMAIL_USER || "destek@checkday.ai"}>`,
       to: email,
       subject: "CheckDay - Şifre Sıfırlama",
       html: `
