@@ -71,6 +71,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Kullanıcı kimlik doğrulaması yapıldı mı?
       if (userData.authenticated) {
+        // Eğer oturum açma yöntemlerinde çakışma yoksa
+        if (userData.provider && userData.provider.includes(',')) {
+          console.log('Kullanıcı birden fazla giriş yöntemi kullanabilir:', userData.provider);
+        }
+        
         // Kullanıcı giriş yapmış, verileri güncelle
         setUser(userData);
         return userData;

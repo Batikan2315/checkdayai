@@ -331,6 +331,13 @@ const authOptions: NextAuthOptions = {
               existingUser.verificationExpires = undefined;
             }
             
+            // Eğer kullanıcı daha önce normal kayıt yaptıysa (Google ile kaydedilmediyse)
+            // provider bilgisini birleşik olarak güncelle
+            if (existingUser.provider !== 'google') {
+              existingUser.provider = existingUser.provider ? `${existingUser.provider},google` : 'google';
+              console.log("Mevcut kullanıcı birden fazla giriş yöntemi kullanabilir:", existingUser.provider);
+            }
+            
             // Profil resmi güncelleme işlemi
             if (googleProfile.picture && typeof googleProfile.picture === 'string') {
               // Google profil resmini optimize et ve Cloudinary'ye yükle

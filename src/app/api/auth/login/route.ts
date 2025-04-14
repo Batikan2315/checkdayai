@@ -50,6 +50,21 @@ export async function POST(req: NextRequest) {
       );
     }
     
+    // Kullanıcı birden fazla giriş yöntemi kullanabilir 
+    // (hem normal hem Google) kontrol et
+    if (user.provider && user.provider.includes('google') && !user.provider.includes('credentials')) {
+      // Eğer provider sadece google ise ve credentials değilse
+      if (!user.password) {
+        return NextResponse.json(
+          {
+            message: "Bu e-posta Google hesabıyla ilişkilendirilmiş. Lütfen Google ile giriş yapın.",
+            code: "GOOGLE_USER_PASSWORD_LOGIN"
+          },
+          { status: 400 }
+        );
+      }
+    }
+    
     // E-posta doğrulanmış mı kontrol et
     if (!user.isVerified) {
       return NextResponse.json(
