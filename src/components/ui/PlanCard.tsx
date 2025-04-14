@@ -74,7 +74,7 @@ export default function PlanCard({
   
   // Creator bilgilerini güvenli bir şekilde işle
   const creatorName = useMemo(() => {
-    if (!creator) return 'Anonim';
+    if (!creator) return 'İsimsiz';
     
     if (creator.firstName && creator.lastName) {
       return `${creator.firstName} ${creator.lastName}`;
@@ -84,7 +84,7 @@ export default function PlanCard({
       return `@${creator.username}`;
     }
     
-    return 'Anonim Kullanıcı';
+    return 'İsimsiz';
   }, [creator]);
   
   const creatorUsername = useMemo(() => {
