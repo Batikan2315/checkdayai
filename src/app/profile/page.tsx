@@ -22,16 +22,17 @@ const formatCreator = (creator: any) => {
     return { username: 'İsimsiz' };
   }
   
-  // Creator bir obje ve username içeriyor
-  if (typeof creator === 'object' && creator !== null && creator.username) {
-    console.log("Creator bir nesne ve username içeriyor:", creator.username);
-    
-    // Döndürmeden önce _id'nin varlığını kontrol edelim
-    if (!creator._id && creator.id) {
-      creator._id = creator.id;
-    }
-    
-    return creator;
+  // Creator doğrudan AuthContext'ten gelen user object
+  if (creator && typeof creator === 'object' && 'username' in creator) {
+    const formattedCreator = {
+      _id: creator._id || creator.id,
+      username: creator.username || 'İsimsiz',
+      firstName: creator.firstName || '',
+      lastName: creator.lastName || '',
+      profilePicture: creator.profilePicture || creator.image || '/images/avatars/default.png'
+    };
+    console.log("Format edilen creator:", formattedCreator);
+    return formattedCreator;
   }
   
   // Creator bir ObjectID veya string
