@@ -86,16 +86,22 @@ export default function Profile() {
     if (!user && !authLoading) {
       router.push("/login");
     } else if (user && user._id) {
-      // Kullanıcı bilgilerini yenile ve planları getir
-      refreshUserData().then(() => {
-        // Sadece ilk yüklemede planları yükle
-        if (userPlans.length === 0) {
-          fetchUserPlans();
-        }
-        if (savedPlans.length === 0) {
-          fetchSavedPlans();
-        }
-      });
+      // İlk yüklemede kullanıcı bilgilerini bir kez yenile
+      const firstLoadKey = `profile_first_load_${user._id}`;
+      const hasLoaded = sessionStorage.getItem(firstLoadKey);
+      
+      if (!hasLoaded) {
+        sessionStorage.setItem(firstLoadKey, 'true');
+        refreshUserData().then(() => {
+          // Planları yükle (ilk yüklemede)
+          if (userPlans.length === 0) {
+            fetchUserPlans();
+          }
+          if (savedPlans.length === 0) {
+            fetchSavedPlans();
+          }
+        });
+      }
     }
   }, [user, authLoading, router]);
 

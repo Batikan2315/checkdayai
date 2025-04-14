@@ -48,6 +48,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setError(null);
       
+      // Son istekten bu yana 2 saniye geçmemişse erken çık
+      const now = Date.now();
+      const lastRefreshTime = localStorage.getItem('lastRefreshTime');
+      if (lastRefreshTime && now - parseInt(lastRefreshTime) < 2000) {
+        console.log('Çok sık API isteği engellendi');
+        return user; // Mevcut kullanıcı verisini dön
+      }
+      
+      // İstek zamanını kaydet
+      localStorage.setItem('lastRefreshTime', now.toString());
+      
       // API'den güncel kullanıcı bilgilerini al
       const response = await fetch('/api/auth/me', {
         method: 'GET',
@@ -93,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       return null;
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const initAuth = async () => {

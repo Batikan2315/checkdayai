@@ -33,7 +33,7 @@ async function sendPasswordResetEmail(email: string, token: string) {
           <h2 style="color: #333;">Şifre Sıfırlama</h2>
           <p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın:</p>
           <p style="margin: 25px 0;">
-            <a href="${APP_URL}/sifremi-sifirla?token=${token}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Şifremi Sıfırla</a>
+            <a href="${APP_URL}/reset-password?token=${token}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Şifremi Sıfırla</a>
           </p>
           <p>Bu bağlantı 1 saat içinde geçerliliğini yitirecektir.</p>
           <p>Bu e-postayı siz talep etmediyseniz, lütfen dikkate almayın.</p>

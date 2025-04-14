@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { useSession } from "next-auth/react";
+import socketIOClient from "socket.io-client";
 
 interface SocketContextType {
   socket: Socket | null;
@@ -22,6 +23,84 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionAttempted, setConnectionAttempted] = useState(false);
   const { data: session } = useSession();
+  const [user, setUser] = useState(session?.user);
+
+  // WebSocket bağlantısını oluştur ve yönet
+  const initSocket = useCallback(() => {
+    try {
+      // Eğer aktif bir Socket bağlantısı varsa yenisini oluşturma
+      if (socket && socket.connected) {
+        console.log("Socket zaten bağlı, yeni bağlantı oluşturulmayacak");
+        return;
+      }
+      
+      console.log("WebSocket istemcisi başlatılıyor");
+      
+      const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'https://checkday.ai';
+      const MAX_RETRIES = 2;
+      
+      // Socket.IO bağlantı ayarları
+      const socketOptions = {
+        transports: ['websocket', 'polling'],
+        reconnectionAttempts: MAX_RETRIES,
+        reconnectionDelay: 1000,
+        timeout: 5000,
+        forceNew: false
+      };
+      
+      // Bağlantıyı oluştur
+      const socketInstance = socketIOClient(SOCKET_URL, socketOptions);
+      
+      socketInstance.on('connect', () => {
+        console.log(`Socket bağlantısı kuruldu: ${socketInstance.id}`);
+        setIsConnected(true);
+        setConnectionError(null);
+        
+        // Kullanıcı kimliği varsa oturum aç
+        if (user?.id) {
+          socketInstance.emit('authenticate', { userId: user.id });
+          console.log(`Kullanıcı ${user.id} kimliği ile Socket oturumu açıldı`);
+        }
+      });
+      
+      socketInstance.on('connect_error', (error) => {
+        console.log("Socket bağlantı hatası:", error.message);
+        setIsConnected(false);
+        setConnectionError(error.message);
+        
+        if (error.message.includes('websocket')) {
+          console.log("WebSocket kullanılamıyor, polling mekanizması devrede");
+        }
+      });
+      
+      socketInstance.on('disconnect', (reason) => {
+        console.log(`Socket bağlantısı kesildi: ${reason}`);
+        setIsConnected(false);
+        
+        if (reason === 'io server disconnect') {
+          // Sunucu tarafından kapatıldı, yeniden bağlanmayı dene
+          setTimeout(() => {
+            socketInstance.connect();
+          }, 2000);
+        }
+      });
+      
+      // Socket referansını güncelle
+      setSocket(socketInstance);
+      
+      // Temizleme fonksiyonu
+      return () => {
+        if (socketInstance) {
+          console.log("Socket bağlantısı temizleniyor");
+          socketInstance.disconnect();
+        }
+      };
+    } catch (error) {
+      console.error("Socket başlatma hatası:", error);
+      setConnectionError("Socket bağlantısı kurulamadı");
+      setIsConnected(false);
+    }
+  }, [user]);
 
   // WebSocket başlatma
   useEffect(() => {

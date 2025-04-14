@@ -23,14 +23,14 @@ export default function ResetPasswordClient() {
   useEffect(() => {
     if (!searchParams) {
       toast.error("Geçersiz şifre sıfırlama bağlantısı");
-      router.push("/giris");
+      router.push("/login");
       return;
     }
     
     const urlToken = searchParams.get("token");
     if (!urlToken) {
       toast.error("Geçersiz şifre sıfırlama bağlantısı");
-      router.push("/giris");
+      router.push("/login");
       return;
     }
     
@@ -63,19 +63,19 @@ export default function ResetPasswordClient() {
         toast.success(result.message || "Şifreniz başarıyla güncellendi");
         // Başarılı şifre sıfırlamadan sonra giriş sayfasına yönlendir
         setTimeout(() => {
-          router.push("/giris");
+          router.push("/login");
         }, 2000);
       } else {
         // Hata kodlarına göre özel mesajlar
         if (result.code === "INVALID_TOKEN") {
           toast.error("Geçersiz veya süresi dolmuş bağlantı. Lütfen yeni bir şifre sıfırlama isteği oluşturun.");
           setTimeout(() => {
-            router.push("/giris");
+            router.push("/login");
           }, 3000);
         } else if (result.code === "USER_NOT_FOUND") {
           toast.error("Kullanıcı bulunamadı. Lütfen yeni bir hesap oluşturun.");
           setTimeout(() => {
-            router.push("/kayit");
+            router.push("/register");
           }, 3000);
         } else {
           toast.error(result.message || "Şifre güncellenirken bir hata oluştu");
@@ -97,7 +97,7 @@ export default function ResetPasswordClient() {
         <p className="text-gray-600 dark:text-gray-300 mb-6 text-center">
           Şifre sıfırlama bağlantınız geçersiz veya süresi dolmuş.
         </p>
-        <Button onClick={() => router.push("/giris")} className="w-full">
+        <Button onClick={() => router.push("/login")} className="w-full">
           Giriş Sayfasına Dön
         </Button>
       </div>

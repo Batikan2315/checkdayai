@@ -97,9 +97,9 @@ export default function useNotifications() {
       issuedApiWarning = true;
     }
     
-    // Çok sık yenileme yapılmasını engelle (en az 10 saniye ara ile)
+    // Çok sık yenileme yapılmasını engelle (en az 30 saniye ara ile - 10 saniye yerine)
     const now = Date.now();
-    if (!options?.force && now - lastFetchRef.current < 10000) {
+    if (!options?.force && now - lastFetchRef.current < 30000) {
       console.log('Çok sık bildirim sorgulaması engellendi');
       return;
     }
@@ -408,11 +408,11 @@ export default function useNotifications() {
     else {
       console.log("WebSocket kullanılamıyor, polling mekanizması devrede");
       
-      // Polling mekanizmasını başlat - 30 saniyede bir bildirim kontrolü
+      // Polling mekanizmasını başlat - 60 saniyede bir bildirim kontrolü (30 saniye yerine)
       pollingInterval = setInterval(() => {
         console.log("Polling bildirim kontrolü yapılıyor");
         fetchNotifications({ force: true });
-      }, 30000); 
+      }, 60000); 
       
       return () => {
         // Polling mekanizmasını temizle
