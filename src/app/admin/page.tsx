@@ -116,6 +116,61 @@ export default function AdminPanel() {
     }
   }, [user, isAdmin, loading, router]);
   
+  // Admin yetkisi kontrolü
+  useEffect(() => {
+    console.log("Admin kontrol durumu:", { loading, user: !!user, isAdmin });
+    
+    const checkAdminStatus = async () => {
+      try {
+        // Manuel olarak admin durumunu API'den kontrol et
+        const response = await fetch('/api/auth/check-admin');
+        const data = await response.json();
+        
+        console.log("Admin API yanıtı:", data);
+        
+        if (!loading) {
+          if (!user) {
+            console.log("Admin paneline erişim reddedildi: Kullanıcı oturumu yok");
+            router.push('/giris');
+            toast.error("Bu sayfaya erişmek için giriş yapmalısınız");
+            return;
+          }
+          
+          if (!isAdmin && !data.isAdmin) {
+            console.log("Admin paneline erişim reddedildi:", { 
+              userId: user._id,
+              userEmail: user.email,
+              userRole: user.role,
+              tokenRole: data.tokenRole,
+              dbRole: data.dbRole 
+            });
+            
+            // Kullanıcıyı ana sayfaya yönlendir
+            router.push('/');
+            toast.error("Bu sayfaya erişmek için admin yetkisine sahip olmalısınız");
+            return;
+          }
+
+          console.log("Admin oturumu doğrulandı:", { 
+            userId: user._id,
+            userEmail: user.email,
+            userRole: user.role,
+            tokenRole: data.tokenRole,
+            dbRole: data.dbRole
+          });
+          
+          // Admin girişi başarılı ise geri sayım verilerini getir
+          fetchCountdownData();
+        }
+      } catch (error) {
+        console.error("Admin kontrolü hatası:", error);
+        toast.error("Yetkilendirme kontrolü sırasında bir hata oluştu");
+      }
+    };
+    
+    checkAdminStatus();
+  }, [user, isAdmin, loading, router]);
+  
   // Geri sayım verilerini getir
   const fetchCountdownData = async () => {
     try {

@@ -50,12 +50,20 @@ export async function GET(req: NextRequest) {
       const user = await User.findOne({ email: userEmail });
       
       if (!user) {
+        console.log("Kullanıcı bulunamadı, email:", userEmail);
         return NextResponse.json({ 
           message: "Kullanıcı bulunamadı",
           authenticated: false,
           timestamp
         }, { status: 200, headers });
       }
+      
+      console.log("Kullanıcı bulundu:", {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        roleType: typeof user.role
+      });
       
       // Profil resmi için cache-busting
       const profilePicture = user.profilePicture ? `${user.profilePicture}?t=${timestamp}` : null;
