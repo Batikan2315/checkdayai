@@ -4,16 +4,23 @@ import Plan from '@/models/Plan';
 import mongoose from 'mongoose';
 import { safeStringify } from '@/lib/utils';
 
+// Next.js 15 route handler tipi
+interface RouteParams {
+  params: {
+    id: string;
+  };
+}
+
 // GET: Belirli bir planı getir
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
     await connectDB();
     
     // params bir Promise değil, doğrudan erişilebilir
-    const { id } = context.params;
+    const { id } = params;
     
     if (!id) {
       return NextResponse.json({ error: 'Plan ID zorunludur' }, { status: 400 });
@@ -50,13 +57,13 @@ export async function GET(
 // PATCH: Plan bilgilerini güncelle
 export async function PATCH(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
     await connectDB();
 
     // params bir Promise değil, doğrudan erişilebilir
-    const { id } = context.params;
+    const { id } = params;
     
     const body = await req.json();
     
@@ -100,13 +107,13 @@ export async function PATCH(
 // DELETE: Planı sil
 export async function DELETE(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
     await connectDB();
 
     // params bir Promise değil, doğrudan erişilebilir
-    const { id } = context.params;
+    const { id } = params;
     
     // Geçerli bir MongoDB ObjectId mi kontrol et
     if (!mongoose.Types.ObjectId.isValid(id)) {

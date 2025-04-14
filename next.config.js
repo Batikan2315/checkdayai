@@ -2,7 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    serverActions: true,
+    serverActions: {
+      allowedOrigins: ['localhost:3000', 'check-day.netlify.app', 'checkday.app']
+    },
   },
   images: {
     domains: [

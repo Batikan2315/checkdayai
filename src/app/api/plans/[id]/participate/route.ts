@@ -4,15 +4,22 @@ import Plan from '@/models/Plan';
 import User from '@/models/User';
 import { isValidObjectId } from '@/lib/utils';
 
+// Next.js 15 route handler tipi
+interface RouteParams {
+  params: {
+    id: string;
+  };
+}
+
 export async function POST(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
     await connectDB();
     
     // params bir Promise değil, doğrudan erişilebilir
-    const { id: planId } = context.params;
+    const { id: planId } = params;
     
     const body = await req.json();
     const { userId, action } = body;

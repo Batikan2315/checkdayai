@@ -4,15 +4,22 @@ import Plan from '@/models/Plan';
 import mongoose from 'mongoose';
 import { isValidObjectId } from '@/lib/utils';
 
+// Next.js 15 route handler tipi
+interface RouteParams {
+  params: {
+    id: string;
+  };
+}
+
 export async function POST(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
     await connectDB();
     
     // params bir Promise değil, doğrudan erişilebilir
-    const { id } = context.params;
+    const { id } = params;
     
     // Body'den kullanıcı ID'sini ve aksiyonu al
     const body = await req.json();
