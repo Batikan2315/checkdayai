@@ -14,6 +14,20 @@ import PlanCard from "@/components/ui/PlanCard";
 
 const NotificationSettingsLazy = lazy(() => import('@/components/settings/NotificationSettings'));
 
+// Yaratıcı bilgilerini güvenli şekilde format fonksiyonu
+const formatCreator = (creator: any) => {
+  if (!creator) return { username: 'Anonim' };
+  
+  if (typeof creator === 'object' && creator.username) {
+    return creator;
+  }
+  
+  return { 
+    username: 'Anonim', 
+    _id: creator?.toString() 
+  };
+};
+
 export default function Profile() {
   const { user, logout, loading: authLoading, refreshUserData } = useAuth();
   const router = useRouter();
@@ -673,7 +687,7 @@ export default function Profile() {
               date={new Date(plan.startDate || Date.now())}
               location={plan.location || (plan.isOnline ? 'Online' : 'Belirtilmemiş')}
               imageUrl={plan.imageUrl}
-              creator={plan.creator}
+              creator={formatCreator(plan.creator)}
               isOnline={plan.isOnline}
               isFree={plan.isFree}
               price={plan.price || 0}
@@ -707,7 +721,7 @@ export default function Profile() {
               date={new Date(plan.startDate || Date.now())}
               location={plan.location || (plan.isOnline ? 'Online' : 'Belirtilmemiş')}
               imageUrl={plan.imageUrl}
-              creator={plan.creator}
+              creator={formatCreator(plan.creator)}
               isOnline={plan.isOnline}
               isFree={plan.isFree}
               price={plan.price || 0}
@@ -741,7 +755,7 @@ export default function Profile() {
               date={new Date(plan.startDate || Date.now())}
               location={plan.location || (plan.isOnline ? 'Online' : 'Belirtilmemiş')}
               imageUrl={plan.imageUrl}
-              creator={plan.creator}
+              creator={formatCreator(plan.creator)}
               isOnline={plan.isOnline}
               isFree={plan.isFree}
               price={plan.price || 0}
