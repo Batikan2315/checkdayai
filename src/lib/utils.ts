@@ -1,6 +1,44 @@
 import { format, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import { IPlan } from "./types";
+import { Types } from "mongoose";
+
+/**
+ * Google ID veya MongoDB ObjectId güvenli şekilde kontrol eder ve dönüştürür
+ * @param id Kontrol edilecek ID
+ * @returns Varsa MongoDB ObjectId, yoksa null
+ */
+export function safeObjectId(id: string | Types.ObjectId | null | undefined): Types.ObjectId | null {
+  if (!id) return null;
+  
+  // Zaten ObjectId ise doğrudan döndür
+  if (id instanceof Types.ObjectId) return id;
+  
+  // String ise ve geçerli bir MongoDB ID ise dönüştür
+  if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+    try {
+      return new Types.ObjectId(id);
+    } catch (error) {
+      console.error("ObjectId dönüştürme hatası:", error);
+      return null;
+    }
+  }
+  
+  // Google ID gibi farklı formattaki ID'ler için null döndür
+  return null;
+}
+
+/**
+ * Değerin MongoDB ObjectId olup olmadığını kontrol eder
+ * @param id Kontrol edilecek ID 
+ * @returns true: MongoDB ObjectId, false: Değil (ör. Google ID)
+ */
+export function isValidObjectId(id: string | Types.ObjectId | null | undefined): boolean {
+  if (!id) return false;
+  if (id instanceof Types.ObjectId) return true;
+  if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) return true;
+  return false;
+}
 
 // Tarih biçimlendirme
 export const formatDate = (date: string | Date): string => {
@@ -135,4 +173,84 @@ export function formatShortDate(date: Date): string {
   const year = date.getFullYear();
   
   return `${day} ${month} ${year}`;
+}
+
+// MongoDB ObjectId'lerini stringe çevirmek için yardımcı fonksiyon
+export function safeStringify(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  // Array içindeki her öğeyi işle
+  if (Array.isArray(obj)) {
+    return obj.map(item => safeStringify(item));
+  }
+  
+  // Nesne ise, yeni bir nesne oluştur ve değerleri kopyala
+  if (typeof obj === 'object') {
+    // Date nesnesini ISO string'e çevir
+    if (obj instanceof Date) {
+      return obj.toISOString();
+    }
+    
+    // Önce yeni bir nesne oluştur
+    const result: any = {};
+    
+    // ObjectId kontrolü
+    if (obj._id) {
+      // toString() çağrılabiliyorsa kullan
+      if (typeof obj._id.toString === 'function') {
+        result._id = obj._id.toString();
+      } else {
+        // Değilse olduğu gibi kopyala
+        result._id = obj._id;
+      }
+    }
+    
+    // Diğer tüm alanları kopyala
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key) && key !== '_id') {
+        // Özel alanlar için kontrol
+        if (key === 'creator' && obj[key]) {
+          if (typeof obj[key].toString === 'function') {
+            // ObjectId ise stringe çevir
+            result[key] = obj[key].toString();
+          } else {
+            // Zaten string ise olduğu gibi kopyala (Google ID)
+            result[key] = obj[key];
+          }
+        }
+        // Likes ve saves alanları için özel işlem
+        else if (key === 'likes' || key === 'saves') {
+          // Özel array tipinde, ObjectId veya string içerebilir
+          result[key] = obj[key] ? obj[key].map((item: any) => {
+            if (typeof item === 'undefined' || item === null) return null;
+            // toString() çağrılabiliyorsa kullan
+            if (typeof item.toString === 'function') {
+              return item.toString();
+            }
+            // Zaten string ise olduğu gibi kopyala
+            return item;
+          }) : [];
+        }
+        // oauth_creator_id alanını olduğu gibi kopyala
+        else if (key === 'oauth_creator_id') {
+          result[key] = obj[key];
+        }
+        // Tarih alanları için kontrol
+        else if (['startDate', 'endDate', 'createdAt', 'updatedAt'].includes(key) && obj[key] instanceof Date) {
+          result[key] = obj[key].toISOString();
+        }
+        // Diğer tüm alanlar için recursive işlem
+        else {
+          result[key] = safeStringify(obj[key]);
+        }
+      }
+    }
+    
+    return result;
+  }
+  
+  // Primitif değerleri olduğu gibi döndür
+  return obj;
 } 

@@ -30,6 +30,13 @@ export async function connectDB() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: true,
+      autoIndex: true,
+      autoCreate: true,
+      // MongoDB'nin bağlantı havuzunu geliştirmek için
+      maxPoolSize: 100, // Bağlantı havuzundaki maksimum bağlantı sayısı
+      minPoolSize: 5,   // Bağlantı havuzunda tutulacak minimum bağlantı sayısı
+      connectTimeoutMS: 10000, // Bağlantı kurma zaman aşımı
+      socketTimeoutMS: 45000,  // Socket zaman aşımı
     };
 
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {

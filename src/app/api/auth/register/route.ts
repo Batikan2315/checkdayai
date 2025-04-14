@@ -2,6 +2,53 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import User from "@/models/User";
 import { generateToken, generateVerificationToken } from "@/lib/auth";
+import nodemailer from "nodemailer";
+import bcryptjs from "bcryptjs";
+
+// E-posta gönderme fonksiyonu
+async function sendVerificationEmail(email: string, token: string) {
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+  // Nodemailer transport oluştur (Gmail)
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER || "your-gmail@gmail.com",
+      pass: process.env.EMAIL_PASSWORD || "your-gmail-password",
+    },
+  });
+
+  // E-posta içeriği
+  const mailOptions = {
+    from: process.env.EMAIL_USER || "your-gmail@gmail.com",
+    to: email,
+    subject: "CheckDay - E-posta Doğrulama",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+        <h2 style="color: #333;">E-posta Doğrulama</h2>
+        <p>CheckDay hesabınızı doğrulamak için aşağıdaki bağlantıya tıklayın:</p>
+        <p style="margin: 25px 0;">
+          <a href="${APP_URL}/api/auth/verify-email?token=${token}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">E-postamı Doğrula</a>
+        </p>
+        <p>Bu bağlantı 24 saat içinde geçerliliğini yitirecektir.</p>
+        <p>Bu e-postayı siz talep etmediyseniz, lütfen dikkate almayın.</p>
+        <p style="margin-top: 30px; font-size: 12px; color: #777;">
+          &copy; ${new Date().getFullYear()} CheckDay. Tüm hakları saklıdır.
+        </p>
+      </div>
+    `,
+  };
+
+  // E-postayı gönder
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Doğrulama e-postası gönderildi:", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("E-posta gönderme hatası:", error);
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,15 +100,18 @@ export async function POST(req: NextRequest) {
       }
     }
     
+    // Şifreyi hashle
+    const hashedPassword = await bcryptjs.hash(password, 10);
+    
     // Yeni kullanıcı oluştur
     const newUser = new User({
+      username,
       email,
-      password,
-      username: username || email.split("@")[0],
+      password: hashedPassword,
       firstName,
       lastName,
       isVerified: false,
-      role: "user",
+      role: "user"
     });
     
     // Otomatik kullanıcı adı oluştur
@@ -69,18 +119,18 @@ export async function POST(req: NextRequest) {
       await newUser.generateUsername();
     }
     
-    // Kullanıcıyı kaydet
-    await newUser.save();
-    
     // Doğrulama token'ı oluştur
     const verificationToken = generateVerificationToken(email);
     
-    // Doğrulama e-postası gönder - Bu örnek için atlanıyor
-    // await sendVerificationEmail(email, verificationToken);
+    // Doğrulama e-postası gönder
+    const emailSent = await sendVerificationEmail(email, verificationToken);
+    
+    // Kullanıcıyı kaydet
+    await newUser.save();
     
     return NextResponse.json(
       {
-        message: "Kullanıcı başarıyla kaydedildi",
+        message: "Kullanıcı başarıyla kaydedildi. Lütfen e-postanızı kontrol edin ve hesabınızı doğrulayın.",
         user: {
           id: newUser._id,
           email: newUser.email,

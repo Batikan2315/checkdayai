@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import Plan from '@/models/Plan';
 import mongoose from 'mongoose';
+import { safeStringify } from '@/lib/utils';
 
 // GET: Belirli bir planı getir
 export async function GET(
@@ -10,24 +11,36 @@ export async function GET(
 ) {
   try {
     await connectDB();
-
-    const id = params.id;
     
-    // Geçerli bir MongoDB ObjectId mi kontrol et
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Geçersiz plan ID' }, { status: 400 });
+    // Next.js 14'te params ilk await edilmeli
+    const { id } = await params;
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Plan ID zorunludur' }, { status: 400 });
     }
-
+    
     const plan = await Plan.findById(id)
-      .populate('creator', 'username firstName lastName profilePicture')
-      .populate('leaders', 'username firstName lastName profilePicture')
+      .populate({
+        path: 'creator',
+        select: 'username firstName lastName profilePicture',
+        model: 'User'
+      })
+      .populate({
+        path: 'leaders',
+        select: 'username firstName lastName profilePicture',
+        model: 'User'
+      })
+      .populate('participants', 'username firstName lastName profilePicture')
       .lean();
-
+    
     if (!plan) {
       return NextResponse.json({ error: 'Plan bulunamadı' }, { status: 404 });
     }
-
-    return NextResponse.json(plan);
+    
+    // Tarih ve ObjectId dönüşümleri için
+    const serializedPlan = safeStringify(plan);
+    
+    return NextResponse.json(serializedPlan);
   } catch (error: any) {
     console.error('Plan detayı getirme hatası:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -42,7 +55,9 @@ export async function PATCH(
   try {
     await connectDB();
 
-    const id = params.id;
+    // Next.js 14'te params ilk await edilmeli
+    const { id } = await params;
+    
     const body = await req.json();
     
     // Geçerli bir MongoDB ObjectId mi kontrol et
@@ -90,7 +105,8 @@ export async function DELETE(
   try {
     await connectDB();
 
-    const id = params.id;
+    // Next.js 14'te params ilk await edilmeli
+    const { id } = await params;
     
     // Geçerli bir MongoDB ObjectId mi kontrol et
     if (!mongoose.Types.ObjectId.isValid(id)) {

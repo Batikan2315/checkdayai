@@ -1,10 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import Plan from '@/models/Plan';
+import User from '@/models/User';
+import { isValidObjectId } from '@/lib/utils';
+
+// Basit bellek içi önbellek - üretimde Redis kullanılabilir
+const CACHE_TTL = 60 * 1000; // 60 saniye
+const cache: Record<string, { data: any; timestamp: number }> = {};
+
+// Önbellek anahtarı oluştur
+function createCacheKey(req: NextRequest): string {
+  const url = new URL(req.url);
+  return `plans:${url.search || 'all'}`;
+}
+
+// Önbellekten veri al
+function getCachedData(key: string) {
+  const cachedItem = cache[key];
+  if (!cachedItem) return null;
+  
+  if (Date.now() - cachedItem.timestamp > CACHE_TTL) {
+    delete cache[key];
+    return null;
+  }
+  
+  return cachedItem.data;
+}
+
+// Önbelleğe veri ekle
+function setCachedData(key: string, data: any) {
+  cache[key] = {
+    data,
+    timestamp: Date.now()
+  };
+}
+
+// Önbelleği temizle (mutasyon sonrası)
+function clearCache() {
+  Object.keys(cache).forEach(key => {
+    if (key.startsWith('plans:')) {
+      delete cache[key];
+    }
+  });
+}
 
 // GET: Tüm planları getir
 export async function GET(req: NextRequest) {
   try {
+    // Önbellek kontrolü
+    const cacheKey = createCacheKey(req);
+    const cachedData = getCachedData(cacheKey);
+    
+    if (cachedData) {
+      // console.log('Plans cache hit:', cacheKey);
+      return NextResponse.json(cachedData);
+    }
+    
     await connectDB();
     
     // URL parametrelerini al
@@ -22,6 +73,24 @@ export async function GET(req: NextRequest) {
     
     if (searchParams.has('isOnline')) {
       query.isOnline = searchParams.get('isOnline') === 'true';
+    }
+    
+    // Kullanıcı filtrelemeleri (oluşturan kişi veya katılımcı)
+    if (searchParams.has('creator')) {
+      const creatorId = searchParams.get('creator');
+      
+      // Hem normal ObjectId hem de OAuth ID için kontrol
+      if (isValidObjectId(creatorId)) {
+        query.creator = creatorId;
+      } else {
+        // OAuth ID için
+        query.oauth_creator_id = creatorId;
+      }
+    }
+    
+    if (searchParams.has('participant')) {
+      const participantId = searchParams.get('participant');
+      query.participants = participantId;
     }
     
     // Tarih filtreleri
@@ -54,18 +123,24 @@ export async function GET(req: NextRequest) {
     const sort: any = {};
     sort[sortField] = sortOrder;
     
-    // Planları getir
+    // Planları getir - daha verimli sorgu (lean kullanımı)
     const plans = await Plan.find(query)
       .sort(sort)
       .skip(skip)
       .limit(limit)
-      .populate('creator', 'username firstName lastName profilePicture')
+      .populate({
+        path: 'creator',
+        select: 'username firstName lastName profilePicture',
+        model: 'User'
+      })
       .lean();
     
-    // Toplam sayı
-    const total = await Plan.countDocuments(query);
+    // Toplam sayı - daha etkili şekilde hesapla
+    // İpucu: Çok fazla sayfalama isteniyorsa, CountDocuments yerine estimatedDocumentCount kullanarak performans iyileştirmesi yapılabilir
+    const countQuery = { ...query };
+    const total = await Plan.countDocuments(countQuery);
     
-    return NextResponse.json({
+    const responseData = {
       plans,
       pagination: {
         total,
@@ -73,7 +148,12 @@ export async function GET(req: NextRequest) {
         limit,
         totalPages: Math.ceil(total / limit),
       },
-    });
+    };
+    
+    // Önbelleğe ekle
+    setCachedData(cacheKey, responseData);
+    
+    return NextResponse.json(responseData);
   } catch (error: any) {
     console.error('Planları getirme hatası:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -87,10 +167,35 @@ export async function POST(req: NextRequest) {
     
     const body = await req.json();
     
+    // Üretim ortamında log'ları azalt
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Plan oluşturma - Gelen veri:", body);
+    }
+    
     // Gerekli alanları kontrol et
-    if (!body.title || !body.description || !body.startDate || !body.location) {
+    if (!body.title || !body.description || !body.startDate) {
       return NextResponse.json(
-        { error: 'Başlık, açıklama, başlangıç tarihi ve konum zorunludur' },
+        { error: 'Başlık, açıklama ve başlangıç tarihi zorunludur' },
+        { status: 400 }
+      );
+    }
+    
+    // Online planlar için konum zorunlu değil
+    if (!body.isOnline && !body.location) {
+      return NextResponse.json(
+        { error: 'Fiziksel planlar için konum zorunludur' },
+        { status: 400 }
+      );
+    }
+    
+    // Tarihler için kontrol
+    try {
+      // Tarih formatını kontrol et
+      new Date(body.startDate);
+      new Date(body.endDate);
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Geçersiz tarih formatı' },
         { status: 400 }
       );
     }
@@ -103,17 +208,57 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Liderlere kullanıcıyı ekle
-    if (!body.leaders || !body.leaders.includes(body.creator)) {
-      body.leaders = [body.creator, ...(body.leaders || [])];
+    // Katılımcı sayısı kontrolü - 0 sınırsız anlamına geliyor
+    if (body.maxParticipants !== undefined) {
+      // Sadece negatif değerler için hata ver
+      if (body.maxParticipants < 0) {
+        return NextResponse.json(
+          { error: 'Katılımcı sayısı negatif olamaz' },
+          { status: 400 }
+        );
+      }
+    }
+    
+    // Kullanıcının Google ID mi yoksa normal User ID mi olduğu kontrolü
+    const isGoogleId = !isValidObjectId(body.creator);
+    
+    const finalBody = {
+      ...body,
+      leaders: []  // leaders alanını boş dizi olarak ayarla
+    };
+
+    if (isGoogleId) {
+      // Google ID kullanıcısı için oauth_creator_id alanını ayarla
+      finalBody.oauth_creator_id = body.creator;
+      finalBody.creator = body.creator; // String olarak sakla
+    } else {
+      // Normal MongoDB ObjectId için liderlere ekle
+      finalBody.leaders = [body.creator];
+    }
+    
+    // Varsayılan değerleri ayarla
+    if (finalBody.allowInvites === undefined) {
+      finalBody.allowInvites = true; // Varsayılan olarak katılımcılar davet gönderebilir
+    }
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Plan oluşturuluyor:", finalBody);
     }
     
     // Yeni plan oluştur
-    const newPlan = await Plan.create(body);
+    const newPlan = await Plan.create(finalBody);
     
-    // Planı kullanıcı bilgileriyle birlikte döndür
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Plan oluşturuldu:", newPlan._id);
+    }
+    
+    // Önbelleği temizle - yeni veri eklendi
+    clearCache();
+    
+    // Planı döndür - populate kullanarak
     const plan = await Plan.findById(newPlan._id)
       .populate('creator', 'username firstName lastName profilePicture')
+      .populate('leaders', 'username firstName lastName profilePicture')
       .lean();
     
     return NextResponse.json(plan, { status: 201 });
@@ -122,7 +267,7 @@ export async function POST(req: NextRequest) {
     
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map((err: any) => err.message);
-      return NextResponse.json({ error: validationErrors }, { status: 400 });
+      return NextResponse.json({ error: validationErrors.join(',') }, { status: 400 });
     }
     
     return NextResponse.json({ error: error.message }, { status: 500 });

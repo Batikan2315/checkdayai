@@ -1,21 +1,28 @@
 import { ObjectId } from "mongoose";
+import { DefaultSession } from "next-auth";
+
+// NOT: NextAuth Session tanımlaması src/app/api/auth/[...nextauth]/route.ts dosyasına taşındı
+// Çakışma olmaması için burada kaldırıldı
 
 export interface IUser {
-  _id?: ObjectId;
+  _id?: string | any;
   username: string;
   email: string;
-  password: string;
+  password?: string;
   firstName?: string;
   lastName?: string;
-  isVerified: boolean;
   profilePicture?: string;
-  balance: number;
+  image?: string; // NextAuth'tan gelen profil resmi için
+  role?: string;
+  isVerified?: boolean;
+  balance?: number;
+  provider?: string; // Google, email vb.
+  oauth_id?: string; // OAuth sağlayıcıdan alınan ID
   createdAt?: Date;
   updatedAt?: Date;
-  role: "user" | "admin";
 
   // Metotlar
-  matchPassword(enteredPassword: string): Promise<boolean>;
+  comparePassword(enteredPassword: string): Promise<boolean>;
   generateUsername(): Promise<void>;
 }
 
@@ -39,6 +46,8 @@ export interface IPlan {
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+  maxParticipants?: number; // Maksimum katılımcı sayısı - opsiyonel
+  oauth_creator_id?: string; // Google OAuth ID
 
   // Sanal alanlar
   likeCount?: number;

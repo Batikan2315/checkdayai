@@ -1,28 +1,55 @@
-import mongoose, { Schema, model, models } from "mongoose";
-import bcrypt from "bcryptjs";
-import { IUser } from "@/lib/types";
+import mongoose, { Schema, Document } from 'mongoose';
+import bcrypt from 'bcryptjs';
 
-const userSchema = new Schema<IUser>(
+export interface IUser extends Document {
+  username: string;
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  isVerified: boolean;
+  profilePicture?: string;
+  balance: number;
+  role: 'user' | 'admin';
+  notificationPreferences: {
+    system: boolean;
+    invitation: boolean;
+    message: boolean;
+    like: boolean;
+    join: boolean;
+    reminder: boolean;
+    email: boolean;
+    push: boolean;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+  oauth_id?: string; // OAuth sağlayıcısından gelen ID
+  comparePassword: (password: string) => Promise<boolean>;
+}
+
+const UserSchema = new Schema<IUser>(
   {
     username: {
       type: String,
-      required: [true, "Kullanıcı adı gereklidir"],
+      required: [true, 'Kullanıcı adı zorunludur'],
       unique: true,
       trim: true,
-      minlength: [3, "Kullanıcı adı en az 3 karakter olmalıdır"],
+      minlength: [3, 'Kullanıcı adı en az 3 karakter olmalıdır'],
+      maxlength: [20, 'Kullanıcı adı en fazla 20 karakter olabilir'],
     },
     email: {
       type: String,
-      required: [true, "E-posta gereklidir"],
+      required: [true, 'E-posta adresi zorunludur'],
       unique: true,
       trim: true,
       lowercase: true,
-      match: [/^\S+@\S+\.\S+$/, "Geçerli bir e-posta adresi giriniz"],
+      match: [/^\S+@\S+\.\S+$/, 'Lütfen geçerli bir e-posta adresi giriniz'],
     },
     password: {
       type: String,
-      required: [true, "Şifre gereklidir"],
-      minlength: [6, "Şifre en az 6 karakter olmalıdır"],
+      required: [true, 'Şifre zorunludur'],
+      minlength: [6, 'Şifre en az 6 karakter olmalıdır'],
+      select: false, // Sorgularda şifreyi dönme
     },
     firstName: {
       type: String,
@@ -38,7 +65,7 @@ const userSchema = new Schema<IUser>(
     },
     profilePicture: {
       type: String,
-      default: "",
+      default: '/images/avatars/default.png',
     },
     balance: {
       type: Number,
@@ -46,43 +73,64 @@ const userSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ["user", "admin"],
-      default: "user",
+      enum: ['user', 'admin'],
+      default: 'user',
+    },
+    notificationPreferences: {
+      system: { type: Boolean, default: true },
+      invitation: { type: Boolean, default: true },
+      message: { type: Boolean, default: true },
+      like: { type: Boolean, default: true },
+      join: { type: Boolean, default: true },
+      reminder: { type: Boolean, default: true },
+      email: { type: Boolean, default: true },
+      push: { type: Boolean, default: true },
+    },
+    oauth_id: {
+      type: String,
+      index: true,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+// Şifre hashleme middleware'i
+UserSchema.pre('save', async function (next) {
+  // Şifre değişmediyse hash işlemini yapma
+  if (!this.isModified('password')) {
+    return next();
+  }
 
   try {
+    console.log('Şifre değişti, yeni hash oluşturuluyor...');
+    // Şifreyi hash'le - salt değerini 10 olarak kullan
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
+    console.log('Şifre hash\'lendi:', this.password.substring(0, 20) + '...');
     next();
   } catch (error: any) {
+    console.error('Şifre hash\'leme hatası:', error);
     next(error);
   }
 });
 
-userSchema.methods.matchPassword = async function (enteredPassword: string) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
-
-userSchema.methods.generateUsername = async function () {
-  if (this.username) return;
-  
-  const baseUsername = this.email.split("@")[0];
-  let username = baseUsername;
-  let counter = 1;
-  
-  // Kullanıcı adı benzersiz olana kadar sayı ekle
-  while (await mongoose.models.User.findOne({ username })) {
-    username = `${baseUsername}${counter}`;
-    counter++;
+// Şifre karşılaştırma metodu
+UserSchema.methods.comparePassword = async function (password: string): Promise<boolean> {
+  try {
+    console.log("Şifre karşılaştırılıyor...");
+    console.log("Veritabanı şifresi (hash):", this.password.substring(0, 20) + "...");
+    const isMatch = await bcrypt.compare(password, this.password);
+    console.log("Şifre eşleşme sonucu:", isMatch);
+    return isMatch;
+  } catch (error) {
+    console.error("Şifre karşılaştırma hatası:", error);
+    throw error;
   }
-  
-  this.username = username;
 };
 
-export default models.User || model<IUser>("User", userSchema); 
+// Mongoose modelinin tekrar derlenme hatasını önlemek için
+const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
+
+export default User; 

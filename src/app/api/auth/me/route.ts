@@ -1,59 +1,142 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import { connectDB } from "@/lib/db";
 import User from "@/models/User";
 import { verifyToken } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
-    // Token'ı oku
-    const authHeader = req.headers.get("Authorization");
+    // CORS ve güvenlik için header'lar ekle
+    const headers = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Cache-Control': 'no-cache, no-store, must-revalidate, private',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    };
+
+    // Oturumu al
+    const session = await getServerSession();
     
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { message: "Yetkilendirme token'ı eksik veya geçersiz" },
-        { status: 401 }
-      );
+    // JWT token kontrolü
+    const authHeader = req.headers.get('authorization');
+    let userId = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        // Token doğrulama işlemi
+        const decoded = verifyToken(token);
+        if (decoded && decoded.id) {
+          userId = decoded.id;
+          console.log("Token doğrulandı, userId:", userId);
+        }
+      } catch (error) {
+        console.error("Token doğrulama hatası:", error);
+      }
     }
     
-    const token = authHeader.split(" ")[1];
-    
-    // Token'ı doğrula
-    const decoded = verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Geçersiz veya süresi dolmuş token" },
-        { status: 401 }
-      );
-    }
-    
+    // Veritabanına bağlan
     await connectDB();
     
-    // Kullanıcıyı bul (password hariç)
-    const user = await User.findById(decoded.id).select("-password");
+    // Cache-busting için timestamp
+    const timestamp = new Date().getTime();
     
-    if (!user) {
-      return NextResponse.json(
-        { message: "Kullanıcı bulunamadı" },
-        { status: 404 }
-      );
+    // Oturum varsa oturum bilgisini kullan, yoksa token kullan
+    if (session && session.user && session.user.email) {
+      // Kullanıcıyı email ile bul
+      const userEmail = session.user.email;
+      const user = await User.findOne({ email: userEmail });
+      
+      if (!user) {
+        return NextResponse.json({ 
+          message: "Kullanıcı bulunamadı",
+          authenticated: false,
+          timestamp
+        }, { status: 200, headers });
+      }
+      
+      // Profil resmi için cache-busting
+      const profilePicture = user.profilePicture ? `${user.profilePicture}?t=${timestamp}` : null;
+      
+      // Kullanıcı verilerini döndür
+      return NextResponse.json({
+        id: user._id,
+        name: user.username || user.firstName,
+        email: user.email,
+        image: profilePicture,
+        profilePicture: profilePicture,
+        role: user.role,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        balance: user.balance,
+        oauth_id: user.oauth_id,
+        provider: user.provider,
+        _id: user._id,
+        authenticated: true,
+        timestamp
+      }, { headers });
+    } 
+    // Token ile kullanıcı kontrolü
+    else if (userId) {
+      const user = await User.findById(userId);
+      
+      if (!user) {
+        return NextResponse.json({ 
+          message: "Token mevcut ama kullanıcı bulunamadı",
+          authenticated: false,
+          timestamp
+        }, { status: 200, headers });
+      }
+      
+      // Profil resmi için cache-busting
+      const profilePicture = user.profilePicture ? `${user.profilePicture}?t=${timestamp}` : null;
+      
+      // Kullanıcı verilerini döndür
+      return NextResponse.json({
+        id: user._id,
+        name: user.username || user.firstName,
+        email: user.email,
+        image: profilePicture,
+        profilePicture: profilePicture,
+        role: user.role,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        balance: user.balance,
+        oauth_id: user.oauth_id,
+        provider: user.provider,
+        _id: user._id,
+        authenticated: true,
+        timestamp
+      }, { headers });
     }
     
-    return NextResponse.json({
-      id: user._id,
-      email: user.email,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      profilePicture: user.profilePicture,
-      isVerified: user.isVerified,
-      balance: user.balance,
-    });
+    // Kimlik doğrulama yapılamadı
+    return NextResponse.json({ 
+      message: "Giriş yapılmamış", 
+      authenticated: false,
+      timestamp
+    }, { status: 200, headers });
   } catch (error: any) {
-    console.error("Kullanıcı bilgileri alma hatası:", error);
+    console.error("Kullanıcı bilgisi alma hatası:", error);
     return NextResponse.json(
-      { message: "Kullanıcı bilgileri alınırken bir hata oluştu", error: error.message },
-      { status: 500 }
+      { 
+        message: "Kullanıcı bilgisi alınamadı", 
+        error: error.message, 
+        authenticated: false,
+        timestamp: new Date().getTime()
+      },
+      { 
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate, private',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
     );
   }
 } 
