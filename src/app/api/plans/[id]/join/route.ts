@@ -12,8 +12,8 @@ export async function POST(
   try {
     await connectDB();
     
-    // Next.js 14'te params ilk await edilmeli
-    const { id } = await params;
+    // params bir Promise değil, doğrudan erişilebilir
+    const { id } = params;
     
     // Body'den kullanıcı ID'sini al
     const body = await req.json();

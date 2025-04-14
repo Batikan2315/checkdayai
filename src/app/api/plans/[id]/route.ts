@@ -12,8 +12,8 @@ export async function GET(
   try {
     await connectDB();
     
-    // Next.js 14'te params ilk await edilmeli
-    const { id } = await params;
+    // params bir Promise değil, doğrudan erişilebilir
+    const { id } = params;
     
     if (!id) {
       return NextResponse.json({ error: 'Plan ID zorunludur' }, { status: 400 });
@@ -55,8 +55,8 @@ export async function PATCH(
   try {
     await connectDB();
 
-    // Next.js 14'te params ilk await edilmeli
-    const { id } = await params;
+    // params bir Promise değil, doğrudan erişilebilir
+    const { id } = params;
     
     const body = await req.json();
     
@@ -105,8 +105,8 @@ export async function DELETE(
   try {
     await connectDB();
 
-    // Next.js 14'te params ilk await edilmeli
-    const { id } = await params;
+    // params bir Promise değil, doğrudan erişilebilir
+    const { id } = params;
     
     // Geçerli bir MongoDB ObjectId mi kontrol et
     if (!mongoose.Types.ObjectId.isValid(id)) {

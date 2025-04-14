@@ -9,11 +9,10 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    connectDB();
+    await connectDB();
     
-    // Next.js Params kurallarına uygun hale getir
-    const id = params.id;
-    const planId = id;
+    // params bir Promise değil, doğrudan erişilebilir
+    const { id: planId } = params;
     
     const body = await req.json();
     const { userId, action } = body;
