@@ -106,9 +106,9 @@ export default function PlanCard({
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const isOwner = userId && creator && (
-    typeof creator === 'string' 
-      ? userId === creator 
-      : (creator as any)?._id && userId === (creator as any)._id.toString()
+    creator._id === userId || 
+    (typeof creator === 'object' && creator._id && userId === creator._id) ||
+    (typeof creator === 'string' && userId === creator)
   );
   const router = useRouter();
   
@@ -328,6 +328,13 @@ export default function PlanCard({
               alt={creator?.username || 'Kullanıcı'}
               className="w-full h-full object-cover"
               onError={handleAvatarError}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (creator?.username) {
+                  router.push(`/@${creator.username}`);
+                }
+              }}
+              style={{ cursor: creator?.username ? 'pointer' : 'default' }}
             />
           </div>
           <div className="flex flex-col">
@@ -335,7 +342,15 @@ export default function PlanCard({
               {creatorName}
             </span>
             {creatorUsername && (
-              <span className="text-xs text-gray-500">
+              <span 
+                className="text-xs text-gray-500 hover:text-blue-500 hover:underline cursor-pointer" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (creator?.username) {
+                    router.push(`/@${creator.username}`);
+                  }
+                }}
+              >
                 {creatorUsername}
               </span>
             )}
@@ -401,25 +416,34 @@ export default function PlanCard({
             )}
           </div>
           
-          {!isOwner ? (
-            <Button 
-              size="sm"
-              variant={isJoined ? "outline" : "primary"}
-              onClick={isJoined ? handleClickDetails : handleJoin}
-              disabled={joining}
-              loading={joining}
-              className="text-xs py-1 px-2 h-7"
-            >
-              {isJoined ? 'Plan Odası' : 'Katıl'}
-            </Button>
-          ) : (
+          {isOwner ? (
             <Button 
               size="sm"
               variant="outline"
               onClick={() => router.push(`/plan/${id}`)}
               className="text-xs py-1 px-2 h-7"
             >
+              Planım
+            </Button>
+          ) : isJoined ? (
+            <Button 
+              size="sm"
+              variant="outline"
+              onClick={handleClickDetails}
+              className="text-xs py-1 px-2 h-7"
+            >
               Plan Odası
+            </Button>
+          ) : (
+            <Button 
+              size="sm"
+              variant="primary"
+              onClick={handleJoin}
+              disabled={joining}
+              loading={joining}
+              className="text-xs py-1 px-2 h-7"
+            >
+              Katıl
             </Button>
           )}
         </div>
