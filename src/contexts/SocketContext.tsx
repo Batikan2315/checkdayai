@@ -57,9 +57,6 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
           autoConnect: false,          // Manuel bağlanacağız
           upgrade: true,               // websocket'e yükseltmeye izin ver
           rememberUpgrade: true,       // websocket tespitini hatırla
-          // Efektif polling aralığını ayarla
-          pingInterval: 15000,        // 15 saniyelik ping aralığı (daha az sunucu yükü)
-          pingTimeout: 10000          // 10 saniyelik ping timeout
         });
         
         // 4. Socket.io olay dinleyicilerini ayarla
