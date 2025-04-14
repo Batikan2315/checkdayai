@@ -537,15 +537,15 @@ export async function likePlan({
 
     if (userLiked) {
       // Kullanıcı halihazırda beğenmişse, beğeniyi kaldır
-      plan.likes = plan.likes?.filter((id: any) => 
+      plan.likes = (plan.likes?.filter((id: any) => 
         id !== userId && (!id || !id.toString || id.toString() !== userId)
-      ) || [];
+      ) || []) as any[];
       
       await plan.save();
     } else {
       // Kullanıcı beğenmemişse, beğeni ekle
       plan.likes = plan.likes || [];
-      plan.likes.push(userId);
+      (plan.likes as any[]).push(userId);
       
       await plan.save();
     }
@@ -582,15 +582,15 @@ export async function savePlan({
 
     if (userSaved) {
       // Kullanıcı halihazırda kaydetmişse, kaydı kaldır
-      plan.saves = plan.saves?.filter((id: any) => 
+      plan.saves = (plan.saves?.filter((id: any) => 
         id !== userId && (!id || !id.toString || id.toString() !== userId)
-      ) || [];
+      ) || []) as any[];
       
       await plan.save();
     } else {
       // Kullanıcı kaydetmemişse, kayıt ekle
       plan.saves = plan.saves || [];
-      plan.saves.push(userId);
+      (plan.saves as any[]).push(userId);
       
       await plan.save();
     }
