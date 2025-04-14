@@ -5,6 +5,7 @@ import Message from "@/models/Message";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+// GET isteği - Tüm mesajları getir
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -34,6 +35,7 @@ export async function GET(
   }
 }
 
+// POST isteği - Yeni mesaj ekle
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -60,9 +62,9 @@ export async function POST(
     
     // İstek body'sini al
     const body = await request.json();
-    const { text } = body;
+    const { content } = body;
     
-    if (!text || text.trim() === "") {
+    if (!content || content.trim() === "") {
       return NextResponse.json(
         { error: "Mesaj içeriği boş olamaz" },
         { status: 400 }
@@ -83,7 +85,7 @@ export async function POST(
     const newMessage = new Message({
       planId,
       sender: session.user.id,
-      text,
+      content, // text yerine content kullanıyoruz
       createdAt: new Date(),
     });
     

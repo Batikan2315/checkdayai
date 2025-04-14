@@ -3,7 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IMessage extends Document {
   planId: mongoose.Types.ObjectId | string;
   sender: mongoose.Types.ObjectId | string;
-  text: string;
+  content: string;
   createdAt: Date;
 }
 
@@ -19,9 +19,9 @@ const MessageSchema = new Schema<IMessage>(
       ref: 'User',
       required: true,
     },
-    text: {
+    content: {
       type: String,
-      required: [true, 'Mesaj metni zorunludur'],
+      required: [true, 'Mesaj içeriği zorunludur'],
       trim: true,
     },
     createdAt: {

@@ -90,7 +90,42 @@ export async function GET(req: NextRequest) {
     
     if (searchParams.has('participant')) {
       const participantId = searchParams.get('participant');
-      query.participants = participantId;
+      
+      // Google ID veya ObjectId kontrolü
+      if (isValidObjectId(participantId)) {
+        query.participants = participantId;
+      } else {
+        // Önce Google ID'ye göre kullanıcıyı bulmayı dene
+        try {
+          const user = await User.findOne({ googleId: participantId });
+          if (user) {
+            query.participants = user._id;
+          } else {
+            // Kullanıcı bulunamadı, boş sonuç döndür
+            return NextResponse.json({
+              plans: [],
+              pagination: {
+                total: 0,
+                page: 1,
+                limit: 10,
+                totalPages: 0,
+              },
+            });
+          }
+        } catch (userError) {
+          console.error('Kullanıcı arama hatası:', userError);
+          // Hata olursa boş sonuç döndür
+          return NextResponse.json({
+            plans: [],
+            pagination: {
+              total: 0,
+              page: 1,
+              limit: 10,
+              totalPages: 0,
+            },
+          });
+        }
+      }
     }
     
     // Tarih filtreleri
