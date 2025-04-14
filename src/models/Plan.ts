@@ -34,6 +34,9 @@ export interface IPlanDocument extends Document, IPlan {
   saveCount?: number;
   participantCount?: number;
   leaderCount?: number;
+  
+  // UI için ek alanlar
+  creatorName?: string;
 }
 
 // Model tipi
