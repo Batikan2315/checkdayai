@@ -8,13 +8,13 @@ import { authOptions } from "@/lib/auth";
 // GET isteği - Tüm mesajları getir
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     await connectDB();
     
     // Plan ID'sini al
-    const planId = params.id;
+    const planId = context.params.id;
     
     if (!planId) {
       return NextResponse.json({ error: "Plan ID belirtilmedi" }, { status: 400 });
@@ -38,7 +38,7 @@ export async function GET(
 // POST isteği - Yeni mesaj ekle
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     await connectDB();
@@ -54,7 +54,7 @@ export async function POST(
     }
     
     // Plan ID'sini al
-    const planId = params.id;
+    const planId = context.params.id;
     
     if (!planId) {
       return NextResponse.json({ error: "Plan ID belirtilmedi" }, { status: 400 });
