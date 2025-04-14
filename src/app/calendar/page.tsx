@@ -167,7 +167,7 @@ export default function Calendar() {
   };
 
   return (
-    <PageContainer title="Takvim">
+    <PageContainer>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Takvim bölümü */}
         <div className="lg:col-span-2">
