@@ -1,8 +1,8 @@
 import mongoose, { Schema, Document, ObjectId } from 'mongoose';
 import { IUser } from './User';
 
-export interface IPlan extends Document {
-  _id: ObjectId;
+export interface IPlan {
+  _id?: ObjectId;
   title: string;
   description: string;
   imageUrl?: string;
@@ -32,6 +32,9 @@ export interface IPlan extends Document {
   participantCount?: number;
   leaderCount?: number;
 }
+
+// Document tipini genişletmek yerine sadece normal tip olarak kullan
+export type IPlanDocument = IPlan & Document;
 
 const PlanSchema = new Schema<IPlan>(
   {
@@ -138,7 +141,7 @@ const PlanSchema = new Schema<IPlan>(
 // Taşma kontrolü
 PlanSchema.pre('save', function(next) {
   // maxParticipants 0 ise sınırsız katılımcı anlamına gelir
-  if (this.maxParticipants > 0 && this.participants.length > this.maxParticipants) {
+  if (this.maxParticipants > 0 && this.participants && this.participants.length > this.maxParticipants) {
     const error = new Error('Maksimum katılımcı sayısı aşıldı');
     return next(error);
   }
@@ -170,6 +173,6 @@ PlanSchema.set("toJSON", { virtuals: true });
 PlanSchema.set("toObject", { virtuals: true });
 
 // Mongoose modelinin tekrar derlenme hatasını önlemek için
-const Plan = mongoose.models.Plan || mongoose.model<IPlan>('Plan', PlanSchema);
+const Plan = mongoose.models.Plan || mongoose.model<IPlanDocument>('Plan', PlanSchema);
 
 export default Plan; 
