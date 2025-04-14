@@ -7,13 +7,13 @@ import { safeStringify } from '@/lib/utils';
 // GET: Belirli bir planı getir
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     await connectDB();
     
     // params bir Promise değil, doğrudan erişilebilir
-    const { id } = params;
+    const { id } = context.params;
     
     if (!id) {
       return NextResponse.json({ error: 'Plan ID zorunludur' }, { status: 400 });
@@ -50,13 +50,13 @@ export async function GET(
 // PATCH: Plan bilgilerini güncelle
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     await connectDB();
 
     // params bir Promise değil, doğrudan erişilebilir
-    const { id } = params;
+    const { id } = context.params;
     
     const body = await req.json();
     
@@ -100,13 +100,13 @@ export async function PATCH(
 // DELETE: Planı sil
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     await connectDB();
 
     // params bir Promise değil, doğrudan erişilebilir
-    const { id } = params;
+    const { id } = context.params;
     
     // Geçerli bir MongoDB ObjectId mi kontrol et
     if (!mongoose.Types.ObjectId.isValid(id)) {

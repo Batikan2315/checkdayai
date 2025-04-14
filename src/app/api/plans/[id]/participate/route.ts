@@ -6,13 +6,13 @@ import { isValidObjectId } from '@/lib/utils';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     await connectDB();
     
     // params bir Promise değil, doğrudan erişilebilir
-    const { id: planId } = params;
+    const { id: planId } = context.params;
     
     const body = await req.json();
     const { userId, action } = body;
