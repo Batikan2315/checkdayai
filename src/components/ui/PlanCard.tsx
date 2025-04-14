@@ -231,6 +231,12 @@ export default function PlanCard({
     }
   };
 
+  // Plan Odasına gitme işlevi
+  const handleGoToRoom = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    router.push(`/plan/${id}`);
+  };
+
   // Beğenme işlevi
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -318,185 +324,180 @@ export default function PlanCard({
   };
 
   return (
-    <Card className="mb-4 overflow-hidden">
-      <CardHeader className="p-0">
-        {/* Creator bilgisi - Instagram benzeri başlık */}
-        <div className="px-3 py-2 flex items-center border-b border-gray-100">
-          <div className="w-8 h-8 rounded-full overflow-hidden mr-2 bg-gray-200 flex-shrink-0">
-            <img 
-              src={creatorAvatar}
-              alt={creator?.username || 'Kullanıcı'}
-              className="w-full h-full object-cover"
-              onError={handleAvatarError}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (creator?.username) {
-                  router.push(`/@${creator.username}`);
-                }
-              }}
-              style={{ cursor: creator?.username ? 'pointer' : 'default' }}
-            />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-medium text-sm text-gray-900 dark:text-white">
-              {creatorName}
-            </span>
-            {creatorUsername && (
-              <span 
-                className="text-xs text-gray-500 hover:text-blue-500 hover:underline cursor-pointer" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (creator?.username) {
-                    router.push(`/@${creator.username}`);
-                  }
-                }}
-              >
-                {creatorUsername}
-              </span>
-            )}
-          </div>
-          {isOwner && (
-            <span className="ml-auto bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-300">
-              Lider
-            </span>
-          )}
-        </div>
-        
-        {/* Plan görüntüsü - Optimize boyut */}
-        <div 
-          className="relative h-40 w-full overflow-hidden cursor-pointer" 
-          onClick={handleClickDetails}
-        >
-          {imageUrl && !imgError ? (
-            <img
-              src={imageUrl}
-              alt={title}
-              className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-              onError={handleImageError}
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gray-200">
-              <FaImage className="h-10 w-10 text-gray-400" />
-            </div>
-          )}
-        </div>
-      </CardHeader>
-      
-      <CardBody className="p-3">
-        {/* Plan bilgileri */}
-        <div onClick={handleClickDetails} className="cursor-pointer mb-2">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 truncate">{title}</h3>
-          <p className="text-sm text-gray-600 line-clamp-2 mb-2">{description}</p>
-          
-          <div className="space-y-1 text-xs text-gray-500">
-            <div className="flex items-center">
-              <FaCalendarAlt className="mr-1 h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{formatDate(date)}</span>
+    <div className="cursor-pointer h-full">
+      <Card className="overflow-hidden h-full flex flex-col hover:shadow-lg transition-shadow duration-300">
+        <div onClick={handleClickDetails} className="flex flex-col h-full">
+          <CardHeader className="p-0">
+            {/* Creator bilgisi - Instagram benzeri başlık */}
+            <div className="px-3 py-2 flex items-center border-b border-gray-100">
+              <div className="w-8 h-8 rounded-full overflow-hidden mr-2 bg-gray-200 flex-shrink-0">
+                <img 
+                  src={creatorAvatar}
+                  alt={creator?.username || 'Kullanıcı'}
+                  className="w-full h-full object-cover"
+                  onError={handleAvatarError}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (creator?.username) {
+                      router.push(`/@${creator.username}`);
+                    }
+                  }}
+                  style={{ cursor: creator?.username ? 'pointer' : 'default' }}
+                />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-medium text-sm text-gray-900 dark:text-white">
+                  {creatorName}
+                </span>
+                {creatorUsername && (
+                  <span 
+                    className="text-xs text-gray-500 hover:text-blue-500 hover:underline cursor-pointer" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (creator?.username) {
+                        router.push(`/@${creator.username}`);
+                      }
+                    }}
+                  >
+                    {creatorUsername}
+                  </span>
+                )}
+              </div>
+              {isOwner && (
+                <span className="ml-auto bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-300">
+                  Lider
+                </span>
+              )}
             </div>
             
-            <div className="flex items-center">
-              <FaMapMarkerAlt className="mr-1 h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{isOnline ? "Online Plan" : location}</span>
-            </div>
-            
-            <div className="flex items-center">
-              <FaUsers className="mr-1 h-3 w-3 flex-shrink-0" />
-              <span>{participantCount || 0} katılımcı {maxParticipants && maxParticipants > 0 ? `/ ${maxParticipants}` : ''}</span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Fiyat bilgisi ve katılma butonu */}
-        <div className="flex justify-between items-center mb-2">
-          <div>
-            {isFree ? (
-              <span className="text-xs text-green-600 font-medium">Ücretsiz</span>
-            ) : (
-              <span className="text-xs text-primary font-medium">{formatCurrency(price)}</span>
-            )}
-          </div>
-          
-          {isOwner ? (
-            <Button 
-              size="sm"
-              variant="outline"
-              onClick={() => router.push(`/plan/${id}`)}
-              className="text-xs py-1 px-2 h-7"
-            >
-              Planım
-            </Button>
-          ) : isJoined ? (
-            <Button 
-              size="sm"
-              variant="outline"
+            {/* Plan görüntüsü - Optimize boyut */}
+            <div 
+              className="relative h-40 w-full overflow-hidden cursor-pointer" 
               onClick={handleClickDetails}
-              className="text-xs py-1 px-2 h-7"
             >
-              Plan Odası
-            </Button>
-          ) : (
-            <Button 
-              size="sm"
-              variant="primary"
-              onClick={handleJoin}
-              disabled={joining}
-              loading={joining}
-              className="text-xs py-1 px-2 h-7"
-            >
-              Katıl
-            </Button>
-          )}
-        </div>
-        
-        {/* Instagram benzeri buton düzeni */}
-        <div className="border-t pt-2">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <button 
-                onClick={handleLike}
-                disabled={liking}
-                className={`${userLiked ? 'text-red-500' : 'text-gray-500'} hover:text-red-500 flex items-center`}
-                aria-label="Beğen"
-              >
-                {userLiked ? (
-                  <FaHeart className="h-5 w-5 mr-1" />
-                ) : (
-                  <FaRegHeart className="h-5 w-5 mr-1" />
-                )}
-                <span className="text-xs">{likeCount}</span>
-              </button>
-              
-              <button 
-                onClick={handleSave}
-                disabled={saving}
-                className={`${userSaved ? 'text-blue-500' : 'text-gray-500'} hover:text-blue-500`}
-                aria-label="Kaydet"
-              >
-                {userSaved ? (
-                  <FaBookmark className="h-5 w-5" />
-                ) : (
-                  <FaRegBookmark className="h-5 w-5" />
-                )}
-              </button>
-              
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // URL'yi panoya kopyala
-                  const shareUrl = `${window.location.origin}/plan/${id}`;
-                  navigator.clipboard.writeText(shareUrl)
-                    .then(() => toast.success('Paylaşım bağlantısı kopyalandı'))
-                    .catch(() => toast.error('Bağlantı kopyalanırken hata oluştu'));
-                }}
-                className="text-gray-500 hover:text-blue-500"
-                aria-label="Paylaş"
-              >
-                <FaShare className="h-5 w-5" />
-              </button>
+              {imageUrl && !imgError ? (
+                <img
+                  src={imageUrl}
+                  alt={title}
+                  className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                  onError={handleImageError}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gray-200">
+                  <FaImage className="h-10 w-10 text-gray-400" />
+                </div>
+              )}
             </div>
-          </div>
+          </CardHeader>
+          
+          <CardBody className="p-4 flex-grow flex flex-col">
+            {/* Plan bilgileri */}
+            <div onClick={handleClickDetails} className="cursor-pointer mb-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 truncate">{title}</h3>
+              <p className="text-sm text-gray-600 line-clamp-2 mb-2">{description}</p>
+              
+              <div className="space-y-1 text-xs text-gray-500">
+                <div className="flex items-center">
+                  <FaCalendarAlt className="mr-1 h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{formatDate(date)}</span>
+                </div>
+                
+                <div className="flex items-center">
+                  <FaMapMarkerAlt className="mr-1 h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{isOnline ? "Online Plan" : location}</span>
+                </div>
+                
+                <div className="flex items-center">
+                  <FaUsers className="mr-1 h-3 w-3 flex-shrink-0" />
+                  <span>{participantCount || 0} katılımcı {maxParticipants && maxParticipants > 0 ? `/ ${maxParticipants}` : ''}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Fiyat bilgisi ve katılma butonu */}
+            <div className="flex justify-between items-center mb-2">
+              <div>
+                {isFree ? (
+                  <span className="text-xs text-green-600 font-medium">Ücretsiz</span>
+                ) : (
+                  <span className="text-xs text-primary font-medium">{formatCurrency(price)}</span>
+                )}
+              </div>
+              
+              {/* Katıl/Katıldınız veya Plan Odası butonu */}
+              <div className="mt-auto pt-4">
+                {isOwner ? (
+                  <Button 
+                    variant="primary" 
+                    className="w-full" 
+                    onClick={handleGoToRoom}
+                  >
+                    Plan Odası
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="primary" 
+                    className="w-full" 
+                    onClick={handleJoin} 
+                    disabled={isJoined || joining}
+                  >
+                    {isJoined ? "Katıldınız" : joining ? "İşlem yapılıyor..." : "Katıl"}
+                  </Button>
+                )}
+              </div>
+            </div>
+            
+            {/* Instagram benzeri buton düzeni */}
+            <div className="border-t pt-2">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center space-x-4">
+                  <button 
+                    onClick={handleLike}
+                    disabled={liking}
+                    className={`${userLiked ? 'text-red-500' : 'text-gray-500'} hover:text-red-500 flex items-center`}
+                    aria-label="Beğen"
+                  >
+                    {userLiked ? (
+                      <FaHeart className="h-5 w-5 mr-1" />
+                    ) : (
+                      <FaRegHeart className="h-5 w-5 mr-1" />
+                    )}
+                    <span className="text-xs">{likeCount}</span>
+                  </button>
+                  
+                  <button 
+                    onClick={handleSave}
+                    disabled={saving}
+                    className={`${userSaved ? 'text-blue-500' : 'text-gray-500'} hover:text-blue-500`}
+                    aria-label="Kaydet"
+                  >
+                    {userSaved ? (
+                      <FaBookmark className="h-5 w-5" />
+                    ) : (
+                      <FaRegBookmark className="h-5 w-5" />
+                    )}
+                  </button>
+                  
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // URL'yi panoya kopyala
+                      const shareUrl = `${window.location.origin}/plan/${id}`;
+                      navigator.clipboard.writeText(shareUrl)
+                        .then(() => toast.success('Paylaşım bağlantısı kopyalandı'))
+                        .catch(() => toast.error('Bağlantı kopyalanırken hata oluştu'));
+                    }}
+                    className="text-gray-500 hover:text-blue-500"
+                    aria-label="Paylaş"
+                  >
+                    <FaShare className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </CardBody>
         </div>
-      </CardBody>
-    </Card>
+      </Card>
+    </div>
   );
 } 

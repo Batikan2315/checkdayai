@@ -16,15 +16,30 @@ const NotificationSettingsLazy = lazy(() => import('@/components/settings/Notifi
 
 // Yaratıcı bilgilerini güvenli şekilde format fonksiyonu
 const formatCreator = (creator: any) => {
-  if (!creator) return { username: 'Anonim' };
+  // Creator tamamen boş veya undefined
+  if (!creator) {
+    console.log("Creator boş, varsayılan değer kullanılıyor");
+    return { username: 'Anonim' };
+  }
   
-  if (typeof creator === 'object' && creator.username) {
+  // Creator bir obje ve username içeriyor
+  if (typeof creator === 'object' && creator !== null && creator.username) {
+    console.log("Creator bir nesne ve username içeriyor:", creator.username);
+    
+    // Döndürmeden önce _id'nin varlığını kontrol edelim
+    if (!creator._id && creator.id) {
+      creator._id = creator.id;
+    }
+    
     return creator;
   }
   
+  // Creator bir ObjectID veya string
+  console.log("Creator ID'ye dönüştürülüyor, tip:", typeof creator);
+  
   return { 
     username: 'Anonim', 
-    _id: creator?.toString() 
+    _id: creator?.toString ? creator.toString() : String(creator)
   };
 };
 
