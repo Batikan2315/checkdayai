@@ -5,16 +5,22 @@ import Message from "@/models/Message";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+interface RouteContext {
+  params: {
+    id: string;
+  }
+}
+
 // GET isteği - Tüm mesajları getir
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
     await connectDB();
     
     // Plan ID'sini al
-    const planId = context.params.id;
+    const planId = params.id;
     
     if (!planId) {
       return NextResponse.json({ error: "Plan ID belirtilmedi" }, { status: 400 });
@@ -38,7 +44,7 @@ export async function GET(
 // POST isteği - Yeni mesaj ekle
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
     await connectDB();
@@ -54,7 +60,7 @@ export async function POST(
     }
     
     // Plan ID'sini al
-    const planId = context.params.id;
+    const planId = params.id;
     
     if (!planId) {
       return NextResponse.json({ error: "Plan ID belirtilmedi" }, { status: 400 });
