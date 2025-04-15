@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardBody, CardFooter } from './Card';
 import Button from './Button';
-import Avatar from './Avatar';
+import Avatar from './UserAvatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
 import { toast } from 'react-hot-toast';
@@ -445,7 +445,7 @@ function MessageItem({ message, currentUserId }: { message: Message; currentUser
             <Avatar 
               src={message.sender.image || '/images/avatars/default.png'} 
               size="xs" 
-              alt={message.sender.name} 
+              username={message.sender.name} 
             />
             <span className="ml-2 font-medium text-xs">{message.sender.name}</span>
           </div>
