@@ -556,96 +556,108 @@ export default function Profile() {
         
         {/* Profil Düzenleme Modal */}
         {isProfileEditModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full">
-              <h3 className="text-xl font-bold mb-4">Profil Düzenle</h3>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Profil Bilgilerini Düzenle</h3>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Kullanıcı Adı</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kullanıcı Adı</label>
+                  <input 
+                    type="text" 
                     value={profileForm.username}
-                    onChange={(e) => setProfileForm(prev => ({...prev, username: e.target.value}))}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    placeholder="Kullanıcı adı"
+                    onChange={(e) => setProfileForm({...profileForm, username: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Sadece küçük harf, rakam ve alt çizgi (_) kullanabilirsiniz</p>
+                  <p className="text-xs text-gray-500 mt-1">Sadece küçük harfler, rakamlar ve alt çizgi (_) kullanabilirsiniz.</p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Ad</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ad</label>
+                  <input 
+                    type="text" 
                     value={profileForm.firstName}
-                    onChange={(e) => setProfileForm(prev => ({...prev, firstName: e.target.value}))}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    placeholder="Ad"
+                    onChange={(e) => setProfileForm({...profileForm, firstName: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Soyad</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Soyad</label>
+                  <input 
+                    type="text" 
                     value={profileForm.lastName}
-                    onChange={(e) => setProfileForm(prev => ({...prev, lastName: e.target.value}))}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    placeholder="Soyad"
+                    onChange={(e) => setProfileForm({...profileForm, lastName: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">E-posta</label>
-                  <input
-                    type="email"
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">E-posta</label>
+                  <input 
+                    type="email" 
                     value={profileForm.email}
-                    onChange={(e) => setProfileForm(prev => ({...prev, email: e.target.value}))}
-                    disabled={user?.provider === "google"}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 disabled:dark:bg-gray-600"
-                    placeholder="E-posta"
+                    disabled={true}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 cursor-not-allowed focus:outline-none dark:text-white"
                   />
-                  {user?.provider === "google" && (
-                    <p className="text-xs text-amber-500 mt-1">Google hesabı ile giriş yaptığınız için e-posta değiştirilemez</p>
-                  )}
+                  <p className="text-xs text-gray-500 mt-1">E-posta adresi değiştirilemez.</p>
                 </div>
                 
+                {user?.provider === "google" ? (
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                    <h4 className="text-sm font-medium text-blue-800 dark:text-blue-400 mb-1">Google Hesabı Bilgisi</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      Google hesabınız ile giriş yapıyorsunuz. Aşağıya bir şifre belirlerseniz, hem Google ile hem de e-posta ve şifre ile giriş yapabilirsiniz.
+                    </p>
+                  </div>
+                ) : null}
+                
                 <div>
-                  <label className="block text-sm font-medium mb-1">Şifre</label>
-                  <input
-                    type="password"
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {user?.provider === "google" ? "Şifre Belirle (İsteğe Bağlı)" : "Yeni Şifre (Boş bırakırsanız değişmez)"}
+                  </label>
+                  <input 
+                    type="password" 
                     value={profileForm.password}
-                    onChange={(e) => setProfileForm(prev => ({...prev, password: e.target.value}))}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    placeholder="Yeni şifre (değiştirmek istemiyorsanız boş bırakın)"
+                    onChange={(e) => setProfileForm({...profileForm, password: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Şifre Tekrar</label>
-                  <input
-                    type="password"
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Şifre Tekrar</label>
+                  <input 
+                    type="password" 
                     value={profileForm.confirmPassword}
-                    onChange={(e) => setProfileForm(prev => ({...prev, confirmPassword: e.target.value}))}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    placeholder="Şifre tekrar"
+                    onChange={(e) => setProfileForm({...profileForm, confirmPassword: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
               </div>
               
-              <div className="flex justify-end space-x-2 mt-6">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsProfileEditModalOpen(false)}
-                  disabled={profileEditLoading}
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsProfileEditModalOpen(false);
+                    // Form bilgilerini sıfırla
+                    setProfileForm({
+                      username: user?.username || "",
+                      firstName: user?.firstName || "",
+                      lastName: user?.lastName || "",
+                      email: user?.email || "",
+                      password: "",
+                      confirmPassword: ""
+                    });
+                  }}
                 >
                   İptal
                 </Button>
-                <Button 
+                <Button
                   onClick={handleProfileUpdate}
-                  disabled={profileEditLoading}
+                  loading={profileEditLoading}
                 >
-                  {profileEditLoading ? "Kaydediliyor..." : "Kaydet"}
+                  Kaydet
                 </Button>
               </div>
             </div>

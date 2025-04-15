@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Providers from "./Providers";
@@ -15,7 +15,12 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "CheckDay - Etkinlik Planlama ve Yönetim Platformu",
   description: "Etkinliklerinizi planlayın, yönetin ve arkadaşlarınızla paylaşın.",
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -28,7 +33,6 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         {/* Meta etiketleri */}
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta httpEquiv="Content-Security-Policy" content="upgrade-insecure-requests" />
       </head>
       <body className={`${inter.className} h-full`}>

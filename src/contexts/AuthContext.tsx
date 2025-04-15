@@ -182,15 +182,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user, getFromCache, saveToCache]);
 
   // Auth context'i başlat
-  const initAuth = useCallback(async () => {
-    if (isInitialized) return;
-    
-    console.log('AuthContext başlatılıyor...');
-    setLoading(true);
-    
+  const initAuth = async () => {
     try {
-      // Session kontrolü yap
+      setLoading(true);
+      
       const sessionData = await getSession();
+      
       if (!sessionData && typeof window !== "undefined" && localStorage.getItem("token")) {
         console.log("Session yok ama token var, temizleniyor");
         localStorage.removeItem("token");
@@ -200,71 +197,151 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       
-      // Önbellekteki kullanıcı bilgisini kontrol et
-      const cachedUser = getFromCache(USER_CACHE_KEY);
-      if (cachedUser) {
-        console.log('Önbellekten kullanıcı yükleniyor');
-        setUser(cachedUser);
-        // Yine de API'den güncel bilgileri al
-        refreshUserData(true).then();
-      } else {
-        // API'den kullanıcı bilgilerini al
-        await refreshUserData(true);
+      if (sessionData) {
+        console.log("Session bulundu:", sessionData);
+        setUser({
+          id: sessionData.user.id,
+          email: sessionData.user.email || "",
+          username: (sessionData.user as any).username || sessionData.user.name || "",
+          firstName: (sessionData.user as any).firstName || "",
+          lastName: (sessionData.user as any).lastName || "",
+          profilePicture: (sessionData.user as any).profilePicture || sessionData.user.image || "",
+          role: sessionData.user.role || "user",
+          balance: (sessionData.user as any).balance || 0,
+          provider: (sessionData.user as any).provider || ""
+        });
+        
+        if ((sessionData.user as any).provider === "google") {
+          console.log("Google ile giriş yapılmış, token verileri güncelleniyor");
+          
+          // Google kullanıcıları için token oluşturma
+          if (typeof window !== "undefined") {
+            localStorage.setItem("token", "google-auth");
+            localStorage.setItem("authInfo", JSON.stringify({
+              id: sessionData.user.id,
+              provider: "google"
+            }));
+          }
+        }
+        
+        setLoading(false);
+        return;
       }
-    } catch (error: any) {
-      console.error('Auth başlatma hatası:', error);
-      setError(error.message);
-    } finally {
+      
+      // localStorage'dan token kontrolü
+      if (typeof window !== "undefined") {
+        const token = localStorage.getItem("token");
+        if (token) {
+          try {
+            // Token'ı kontrol et
+            const response = await fetch("/api/auth/me", {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              }
+            });
+            
+            if (response.ok) {
+              const userData = await response.json();
+              if (userData.authenticated) {
+                console.log("localStorage'dan token ile kullanıcı doğrulandı:", userData);
+                setUser(userData);
+                saveToCache(USER_CACHE_KEY, userData);
+              } else {
+                console.log("Token geçerli değil, temizleniyor");
+                localStorage.removeItem("token");
+                localStorage.removeItem("authInfo");
+                setUser(null);
+              }
+            } else {
+              console.log("Token doğrulama hatası, temizleniyor");
+              localStorage.removeItem("token");
+              localStorage.removeItem("authInfo");
+              setUser(null);
+            }
+          } catch (error) {
+            console.error("Token doğrulama hatası:", error);
+            localStorage.removeItem("token");
+            localStorage.removeItem("authInfo");
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      }
+      
+      setLoading(false);
+      setIsInitialized(true);
+    } catch (error) {
+      console.error("AuthContext initleme hatası:", error);
       setLoading(false);
       setIsInitialized(true);
     }
-  }, [isInitialized, getFromCache, refreshUserData]);
+  };
 
   useEffect(() => {
     // İlklendirme tamamlandıysa tekrar çalışma
     if (isInitialized) return;
     
-    const initAuth = async () => {
-      try {
-        setLoading(true);
-        
-        // Önbellekten session kontrolü
-        const cachedSession = getFromCache(SESSION_CACHE_KEY);
-        if (cachedSession) {
-          console.log("Önbellek session kullanılıyor");
-          try {
-            // Önbellekten kullanıcı bilgilerini kullan
-            const cachedUser = getFromCache(USER_CACHE_KEY);
-            if (cachedUser) {
-              setUser(cachedUser);
-              setLoading(false);
-              setIsInitialized(true);
-              
-              // Arka planda yine de session kontrol et (Önbellek TTL içinde değilse)
-              setTimeout(() => {
-                checkSession();
-              }, 100);
-              
-              return;
-            }
-          } catch (error) {
-            console.error("Önbellek hatası:", error);
-          }
-        }
-        
-        // Önbellekte geçerli veri yoksa normal session kontrolü yap
-        await checkSession();
-        setIsInitialized(true);
-      } catch (error) {
-        console.error("AuthContext initleme hatası:", error);
-        setLoading(false);
-        setIsInitialized(true);
-      }
+    // Auth başlatma
+    initAuth();
+    
+    // Session değişikliklerinde güncelleme yap
+    const handleSessionChange = async () => {
+      await initAuth();
     };
     
-    // Init işlemini başlat
-    initAuth();
-  }, [getFromCache, isInitialized]);
+    // Event listener ekle
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", handleSessionChange);
+    }
+    
+    // Cleanup
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleSessionChange);
+      }
+    };
+  }, [isInitialized]);
+  
+  // Session değiştiğinde otomatik güncelle
+  useEffect(() => {
+    if (status === "authenticated" && session) {
+      console.log("Session değişti, kullanıcı bilgileri güncelleniyor:", session);
+      
+      setUser({
+        id: session.user.id,
+        email: session.user.email || "",
+        username: (session.user as any).username || session.user.name || "",
+        firstName: (session.user as any).firstName || "",
+        lastName: (session.user as any).lastName || "",
+        profilePicture: (session.user as any).profilePicture || session.user.image || "",
+        role: session.user.role || "user",
+        balance: (session.user as any).balance || 0,
+        provider: (session.user as any).provider || ""
+      });
+      
+      // Google kullanıcıları için token oluştur
+      if ((session.user as any).provider === "google") {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("token", "google-auth");
+          localStorage.setItem("authInfo", JSON.stringify({
+            id: session.user.id,
+            provider: "google"
+          }));
+        }
+      }
+    } else if (status === "unauthenticated") {
+      console.log("Session sona erdi, kullanıcı çıkış yapıldı");
+      // Token ve kullanıcı verilerini temizle
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("token");
+        localStorage.removeItem("authInfo");
+      }
+      setUser(null);
+    }
+  }, [session, status]);
 
   // Session kontrolü için ayrı bir fonksiyon
   const checkSession = async () => {

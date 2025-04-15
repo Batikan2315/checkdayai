@@ -11,7 +11,7 @@ declare global {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -29,7 +29,7 @@ export async function POST(
     }
 
     await connectDB();
-    const planId = params.id;
+    const planId = context.params.id;
 
     // Plan ID geçerli mi kontrol et
     if (!ObjectId.isValid(planId)) {

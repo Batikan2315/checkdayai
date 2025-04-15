@@ -145,20 +145,12 @@ const LoginForm = () => {
   const handleGoogleLogin = async () => {
     try {
       setGoogleLoading(true);
-      const result = await signIn("google", {
-        redirect: false,
+      await signIn("google", {
         callbackUrl: "/"
       });
-      
-      if (result?.error) {
-        toast.error("Google girişi başarısız: " + result.error);
-      } else if (result?.url) {
-        router.push(result.url);
-      }
     } catch (error) {
       console.error("Google girişi hatası:", error);
       toast.error("Google ile giriş yapılırken bir hata oluştu");
-    } finally {
       setGoogleLoading(false);
     }
   };

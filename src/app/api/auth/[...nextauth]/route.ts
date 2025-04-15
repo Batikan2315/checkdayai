@@ -360,16 +360,21 @@ const authOptions: NextAuthOptions = {
               console.log("Mevcut kullanıcı birden fazla giriş yöntemi kullanabilir:", existingUser.provider);
             }
             
-            // Profil resmi güncelleme işlemi
-            if (googleProfile.picture && typeof googleProfile.picture === 'string') {
-              // Google profil resmini optimize et ve Cloudinary'ye yükle
-              const optimizedProfilePic = await getOptimizedProfilePicture(
-                googleProfile.picture,
-                existingUser._id.toString(),
-                existingUser.profilePicture
-              );
-              
-              existingUser.profilePicture = optimizedProfilePic;
+            try {
+              // Profil resmi güncelleme işlemi
+              if (googleProfile.picture && typeof googleProfile.picture === 'string') {
+                // Google profil resmini optimize et ve Cloudinary'ye yükle
+                const optimizedProfilePic = await getOptimizedProfilePicture(
+                  googleProfile.picture,
+                  existingUser._id.toString(),
+                  existingUser.profilePicture
+                );
+                
+                existingUser.profilePicture = optimizedProfilePic;
+              }
+            } catch (imageError) {
+              console.error("Profil resmi güncelleme hatası:", imageError);
+              // Hata olursa işlemi devam ettir
             }
             
             // Ad-soyad bilgilerini güncelle (eğer boşsa)
@@ -398,15 +403,20 @@ const authOptions: NextAuthOptions = {
               role: "user",
             });
             
-            // Profil resmi ekleme
-            if (googleProfile.picture && typeof googleProfile.picture === 'string') {
-              // Google profil resmini optimize et ve Cloudinary'ye yükle
-              const optimizedProfilePic = await getOptimizedProfilePicture(
-                googleProfile.picture,
-                newUser._id.toString()
-              );
-              
-              newUser.profilePicture = optimizedProfilePic;
+            try {
+              // Profil resmi ekleme
+              if (googleProfile.picture && typeof googleProfile.picture === 'string') {
+                // Google profil resmini optimize et ve Cloudinary'ye yükle
+                const optimizedProfilePic = await getOptimizedProfilePicture(
+                  googleProfile.picture,
+                  newUser._id.toString()
+                );
+                
+                newUser.profilePicture = optimizedProfilePic;
+              }
+            } catch (imageError) {
+              console.error("Profil resmi ekleme hatası:", imageError);
+              // Hata olursa işlemi devam ettir
             }
             
             await newUser.save();
@@ -433,7 +443,18 @@ const authOptions: NextAuthOptions = {
     signIn: "/login",
     error: "/login"
   },
-  debug: process.env.NODE_ENV === "development",
+  debug: true,
+  logger: {
+    error(code, metadata) {
+      console.error('[NEXT-AUTH] Error:', code, metadata);
+    },
+    warn(code) {
+      console.warn('[NEXT-AUTH] Warning:', code);
+    },
+    debug(code, metadata) {
+      console.log('[NEXT-AUTH] Debug:', code, metadata);
+    }
+  }
 };
 
 const handler = NextAuth(authOptions);
