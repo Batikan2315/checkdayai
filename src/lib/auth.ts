@@ -78,6 +78,12 @@ export const authOptions: NextAuthOptions = {
           token.oauth_id = token.sub;
         }
 
+        // Özel admin kontrolü - bilinen admin e-postaları için
+        if (token.email === "batikan@checkday.org") {
+          console.log("JWT callback - Admin e-postası tespit edildi, admin rolü atanıyor");
+          token.role = "admin";
+        }
+
         // Tüm giriş yöntemleri için MongoDB'den rol kontrolü yap
         try {
           await connectDB();
@@ -95,6 +101,15 @@ export const authOptions: NextAuthOptions = {
           } else if (!token.role) {
             console.log("JWT callback - role değeri eksik, varsayılan atanıyor");
             token.role = "user";
+          }
+          
+          // Eğer bilinen bir admin e-postası ise ve veritabanında rolü ayarlanmamışsa, güncelle
+          if (token.email === "batikan@checkday.org" && (!dbUser?.role || dbUser.role !== "admin")) {
+            console.log("Admin rolü veritabanında güncelleniyor...");
+            await User.updateOne(
+              { email: token.email },
+              { $set: { role: "admin" } }
+            );
           }
         } catch (error) {
           console.error("JWT callback - MongoDB rolü alınamadı:", error);
@@ -143,6 +158,12 @@ interface TokenPayload {
 // JWT token oluşturma
 export const generateToken = (payload: TokenPayload): string => {
   const secret = process.env.JWT_SECRET || 'supersecret';
+  
+  // Admin e-posta kontrolü
+  if (payload.email === "batikan@checkday.org") {
+    payload.role = "admin";
+  }
+  
   // 1 gün geçerli token
   return jwt.sign(payload, secret, { expiresIn: '1d' });
 };

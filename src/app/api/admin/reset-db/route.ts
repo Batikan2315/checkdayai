@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     // Admin kullanıcısı oluştur
     const adminUser = new User({
-      username: "admin",
+      username: "batikan_admin",
       email: "batikan@checkday.org",
       password: await bcrypt.hash("checkday123", 10),
       firstName: "Batıkan",

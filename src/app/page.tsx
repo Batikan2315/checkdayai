@@ -1,15 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import PageContainer from "@/components/layout/PageContainer";
 import { Card, CardBody } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { FaCalendarAlt, FaUserFriends, FaRobot, FaClock, FaMapMarkerAlt, FaSearch, FaArrowRight, FaApple, FaGooglePlay } from "react-icons/fa";
-import { getPlans } from "@/lib/actions";
 import PlanCard from "@/components/ui/PlanCard";
 import { toast } from "react-hot-toast";
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import { BsArrowRight } from "react-icons/bs";
+
+// API İstekleri için önbellek anahtarları ve geçerlilik süreleri
+const PLANS_CACHE_KEY = 'homepage_plans_cache';
+const PLANS_CACHE_TTL = 30 * 60 * 1000; // 30 dakika (ms)
 
 export default function Home() {
   const [countdown, setCountdown] = useState<{
@@ -25,6 +31,45 @@ export default function Home() {
   }>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const router = useRouter();
+
+  // Önbellekten veri alma işlevi
+  const getFromCache = useCallback((key: string) => {
+    if (typeof window === 'undefined') return null;
+    
+    try {
+      const cachedData = localStorage.getItem(key);
+      if (!cachedData) return null;
+      
+      const { data, expires } = JSON.parse(cachedData);
+      if (Date.now() > expires) {
+        localStorage.removeItem(key);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error(`Önbellek okuma hatası (${key}):`, error);
+      return null;
+    }
+  }, []);
+
+  // Önbelleğe veri kaydetme işlevi
+  const saveToCache = useCallback((key: string, data: any, ttl: number = PLANS_CACHE_TTL) => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const cacheItem = {
+        data,
+        expires: Date.now() + ttl
+      };
+      localStorage.setItem(key, JSON.stringify(cacheItem));
+    } catch (error) {
+      console.error(`Önbellek yazma hatası (${key}):`, error);
+    }
+  }, []);
 
   // Geri sayım bilgilerini getir
   useEffect(() => {
@@ -72,38 +117,123 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  // Rastgele planları getir
-  useEffect(() => {
-    const fetchRandomPlans = async () => {
-      try {
-        setLoading(true);
-        // Her seferinde farklı planlar getirmek için timestamp ekleyelim
-        const timestamp = new Date().getTime();
-        const response = await fetch(`/api/plans?limit=10&published=true&_t=${timestamp}`);
-        const data = await response.json();
-        
-        console.log("API yanıtı:", data); // Debug için yanıtı konsola yazdır
-        
-        if (data && data.plans && data.plans.length > 0) {
-          // Planları karıştır ve rastgele 3 tanesini al
-          const shuffledPlans = [...data.plans].sort(() => 0.5 - Math.random());
-          const randomPlans = shuffledPlans.slice(0, 3);
-          setPlans(randomPlans);
-        } else {
-          console.error("Planlar için boş veya beklenmeyen API yanıtı:", data);
-          setPlans([]);
-        }
-      } catch (error) {
-        console.error("Planları getirme hatası:", error);
-        toast.error("Planlar yüklenirken bir hata oluştu");
-        setPlans([]);
-      } finally {
+  // Plan verileri al
+  const fetchRandomPlans = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Önbellek kontrolü
+      const cachedPlans = getFromCache(PLANS_CACHE_KEY);
+      if (cachedPlans) {
+        console.log('Önbellekten plan verileri kullanılıyor');
+        setPlans(cachedPlans);
         setLoading(false);
+        return;
+      }
+      
+      // Session kontrolü - kullanıcı giriş yapmamışsa gereksiz API isteği yapma
+      if (!user) {
+        console.log('Kullanıcı giriş yapmadı, API isteği engelleniyor');
+        setPlans([]);
+        setLoading(false);
+        if (localStorage.getItem('token')) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('authInfo');
+        }
+        return;
+      }
+      
+      const response = await fetch('/api/plans?limit=10&published=true', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'X-Random-Cache-Bust': Math.random().toString()
+        }
+      });
+      
+      const data = await response.json();
+      console.log('API yanıtı:', data);
+      
+      if (response.ok && data?.plans?.length > 0) {
+        // API yanıtını önbelleğe kaydet
+        saveToCache(PLANS_CACHE_KEY, data.plans);
+        
+        // Planları karıştır ve rastgele 3 tanesini al
+        const shuffledPlans = [...data.plans].sort(() => 0.5 - Math.random());
+        const randomPlans = shuffledPlans.slice(0, 3);
+        setPlans(randomPlans);
+      } else {
+        console.log('Planlar için boş veya beklenmeyen API yanıtı:', data);
+        setPlans([]);
+      }
+    } catch (error: any) {
+      console.error('Planlar alınırken hata:', error);
+      setError(error.message);
+      toast.error("Planlar yüklenirken bir hata oluştu");
+      setPlans([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [getFromCache, saveToCache, user]);
+
+  useEffect(() => {
+    const initHomepage = async () => {
+      // Son istek zamanını kontrol et
+      if (typeof window !== 'undefined') {
+        const lastFetchTime = localStorage.getItem('lastHomepageFetch');
+        const currentTime = Date.now();
+        
+        // Son istekten beri 3 dakika (180 saniye) geçmediyse tekrar istek atma
+        if (lastFetchTime && currentTime - parseInt(lastFetchTime) < 180000) {
+          console.log('Son istekten beri 3 dakikadan az zaman geçti, istek engelleniyor');
+          
+          // Önbellekten veri kullan
+          const cachedPlans = getFromCache(PLANS_CACHE_KEY);
+          if (cachedPlans) {
+            setPlans(cachedPlans);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // Session kontrolü - kullanıcı giriş yapmamışsa gereksiz API isteği yapma
+        if (!user) {
+          console.log('Kullanıcı giriş yapmadı, API isteği engelleniyor');
+          setPlans([]);
+          setLoading(false);
+          if (localStorage.getItem('token')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('authInfo');
+          }
+          return;
+        }
+        
+        // Gereksiz API çağrılarını engellemek için yükleme sonrası session kontrolü
+        const hasLoadedBefore = sessionStorage.getItem('homepage_loaded');
+        
+        // İlk yükleme
+        if (!hasLoadedBefore) {
+          sessionStorage.setItem('homepage_loaded', 'true');
+          await fetchRandomPlans();
+          localStorage.setItem('lastHomepageFetch', currentTime.toString());
+        } else {
+          // Önbellekten plan verilerini kontrol et
+          const cachedPlans = getFromCache(PLANS_CACHE_KEY);
+          if (cachedPlans) {
+            setPlans(cachedPlans);
+            setLoading(false);
+          } else {
+            await fetchRandomPlans();
+            localStorage.setItem('lastHomepageFetch', currentTime.toString());
+          }
+        }
+      } else {
+        await fetchRandomPlans();
       }
     };
-
-    fetchRandomPlans();
-  }, []);
+    
+    initHomepage();
+  }, [fetchRandomPlans, getFromCache]);
 
   return (
     <PageContainer>
@@ -254,8 +384,21 @@ export default function Home() {
           </div>
           
           {loading ? (
-            <div className="flex justify-center my-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <div className="grid md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((skeleton) => (
+                <div key={skeleton} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-0 rounded-lg shadow-sm overflow-hidden animate-pulse">
+                  <div className="h-48 bg-gray-300 dark:bg-gray-700 w-full"></div>
+                  <div className="p-4">
+                    <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-3/4 mb-3"></div>
+                    <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-full mb-2"></div>
+                    <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-2/3"></div>
+                    <div className="mt-4 flex justify-between items-center">
+                      <div className="h-8 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div>
+                      <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded w-1/3"></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : plans && plans.length > 0 ? (
             <div className="grid md:grid-cols-3 gap-6">

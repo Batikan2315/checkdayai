@@ -11,6 +11,7 @@ import {
   useSession, 
   getSession 
 } from "next-auth/react";
+import axios from "axios";
 
 interface AuthContextType {
   user: IUser | null;
@@ -34,30 +35,94 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Önbellek anahtarları ve zaman sabitleri
+const SESSION_CACHE_KEY = 'session_cache';
+const USER_CACHE_KEY = 'user_cache';
+const SESSION_CACHE_TTL = 5 * 60 * 1000; // 5 dakika (ms)
+const API_REQUEST_THROTTLE = 2000; // 2 saniye (ms)
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false); // İlk yükleme tamamlandı mı?
   const router = useRouter();
   
   // NextAuth session
   const { data: session, status } = useSession();
 
-  // Kullanıcı bilgilerini yenile
-  const refreshUserData = useCallback(async () => {
+  // Önbellekten veri al
+  const getFromCache = useCallback((key: string) => {
+    if (typeof window === 'undefined') return null;
+    
     try {
-      setError(null);
+      const cachedData = localStorage.getItem(key);
+      if (!cachedData) return null;
       
-      // Son istekten bu yana 2 saniye geçmemişse erken çık
+      const { data, expires } = JSON.parse(cachedData);
+      if (Date.now() > expires) {
+        localStorage.removeItem(key);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error(`Önbellek okuma hatası (${key}):`, error);
+      return null;
+    }
+  }, []);
+
+  // Önbelleğe veri kaydet
+  const saveToCache = useCallback((key: string, data: any, ttl: number = SESSION_CACHE_TTL) => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const cacheItem = {
+        data,
+        expires: Date.now() + ttl
+      };
+      localStorage.setItem(key, JSON.stringify(cacheItem));
+    } catch (error) {
+      console.error(`Önbellek yazma hatası (${key}):`, error);
+    }
+  }, []);
+
+  // Kullanıcı bilgilerini yenile
+  const refreshUserData = useCallback(async (force = false) => {
+    try {
+      // Son istekten bu yana 2 saniye geçmemişse ve force parametresi true değilse erken çık
       const now = Date.now();
       const lastRefreshTime = localStorage.getItem('lastRefreshTime');
-      if (lastRefreshTime && now - parseInt(lastRefreshTime) < 2000) {
+      if (!force && lastRefreshTime && now - parseInt(lastRefreshTime) < API_REQUEST_THROTTLE) {
         console.log('Çok sık API isteği engellendi');
+        
+        // Önbellekteki kullanıcı verilerini kontrol et
+        const cachedUser = getFromCache(USER_CACHE_KEY);
+        if (cachedUser) {
+          console.log('Önbellekten kullanıcı verileri kullanılıyor');
+          // Eğer state değişecekse set edelim, aynı ise gerek yok
+          if (JSON.stringify(user) !== JSON.stringify(cachedUser)) {
+            setUser(cachedUser);
+          }
+          return cachedUser;
+        }
+        
         return user; // Mevcut kullanıcı verisini dön
       }
       
       // İstek zamanını kaydet
       localStorage.setItem('lastRefreshTime', now.toString());
+      
+      // Önce önbellekteki kullanıcı bilgilerine bak
+      const cachedUser = getFromCache(USER_CACHE_KEY);
+      if (cachedUser && !force) {
+        console.log('Önbellekten kullanıcı verileri kullanılıyor');
+        // Eğer state değişecekse set edelim, aynı ise gerek yok
+        if (JSON.stringify(user) !== JSON.stringify(cachedUser)) {
+          setUser(cachedUser);
+        }
+        return cachedUser;
+      }
       
       // API'den güncel kullanıcı bilgilerini al
       const response = await fetch('/api/auth/me', {
@@ -87,12 +152,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('Kullanıcı birden fazla giriş yöntemi kullanabilir:', userData.provider);
         }
         
-        // Kullanıcı giriş yapmış, verileri güncelle
-        setUser(userData);
+        // Kullanıcı verilerini önbelleğe al
+        saveToCache(USER_CACHE_KEY, userData);
+        
+        // Kullanıcı giriş yapmış, verileri güncelle (değişiklik varsa)
+        if (JSON.stringify(user) !== JSON.stringify(userData)) {
+          setUser(userData);
+        }
         return userData;
       } else {
-        // Kullanıcı giriş yapmamış, null yap
-        setUser(null);
+        // Kullanıcı giriş yapmamış, null yap (değişiklik varsa)
+        if (user !== null) {
+          setUser(null);
+        }
         if (userData.error) {
           setError(userData.error);
         }
@@ -101,21 +173,149 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error('Kullanıcı bilgileri yenileme hatası:', error);
       setError(error.message);
-      setUser(null);
+      // Değişiklik varsa state'i güncelle
+      if (user !== null) {
+        setUser(null);
+      }
       return null;
     }
-  }, [user]);
+  }, [user, getFromCache, saveToCache]);
+
+  // Auth context'i başlat
+  const initAuth = useCallback(async () => {
+    if (isInitialized) return;
+    
+    console.log('AuthContext başlatılıyor...');
+    setLoading(true);
+    
+    try {
+      // Session kontrolü yap
+      const sessionData = await getSession();
+      if (!sessionData && typeof window !== "undefined" && localStorage.getItem("token")) {
+        console.log("Session yok ama token var, temizleniyor");
+        localStorage.removeItem("token");
+        localStorage.removeItem("authInfo");
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      
+      // Önbellekteki kullanıcı bilgisini kontrol et
+      const cachedUser = getFromCache(USER_CACHE_KEY);
+      if (cachedUser) {
+        console.log('Önbellekten kullanıcı yükleniyor');
+        setUser(cachedUser);
+        // Yine de API'den güncel bilgileri al
+        refreshUserData(true).then();
+      } else {
+        // API'den kullanıcı bilgilerini al
+        await refreshUserData(true);
+      }
+    } catch (error: any) {
+      console.error('Auth başlatma hatası:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+      setIsInitialized(true);
+    }
+  }, [isInitialized, getFromCache, refreshUserData]);
 
   useEffect(() => {
+    // İlklendirme tamamlandıysa tekrar çalışma
+    if (isInitialized) return;
+    
     const initAuth = async () => {
-      setLoading(true);
-      await refreshUserData();
-      setLoading(false);
+      try {
+        setLoading(true);
+        
+        // Önbellekten session kontrolü
+        const cachedSession = getFromCache(SESSION_CACHE_KEY);
+        if (cachedSession) {
+          console.log("Önbellek session kullanılıyor");
+          try {
+            // Önbellekten kullanıcı bilgilerini kullan
+            const cachedUser = getFromCache(USER_CACHE_KEY);
+            if (cachedUser) {
+              setUser(cachedUser);
+              setLoading(false);
+              setIsInitialized(true);
+              
+              // Arka planda yine de session kontrol et (Önbellek TTL içinde değilse)
+              setTimeout(() => {
+                checkSession();
+              }, 100);
+              
+              return;
+            }
+          } catch (error) {
+            console.error("Önbellek hatası:", error);
+          }
+        }
+        
+        // Önbellekte geçerli veri yoksa normal session kontrolü yap
+        await checkSession();
+        setIsInitialized(true);
+      } catch (error) {
+        console.error("AuthContext initleme hatası:", error);
+        setLoading(false);
+        setIsInitialized(true);
+      }
     };
     
+    // Init işlemini başlat
     initAuth();
-  }, [refreshUserData]);
+  }, [getFromCache, isInitialized]);
 
+  // Session kontrolü için ayrı bir fonksiyon
+  const checkSession = async () => {
+    try {
+      // İlk olarak session kontrolü yap
+      const sessionData = await getSession();
+      
+      // Session'ı önbelleğe kaydet
+      if (sessionData) {
+        saveToCache(SESSION_CACHE_KEY, sessionData);
+      }
+      
+      // Session yoksa ve localStorage'da token varsa temizle
+      if (!sessionData && typeof window !== "undefined" && localStorage.getItem("token")) {
+        console.log("Session yok ama token var, temizleniyor");
+        localStorage.removeItem("token");
+        localStorage.removeItem("authInfo");
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      
+      const userData = await refreshUserData();
+      
+      // Admin kullanıcı e-postası için özel kontrol
+      // Bilinen admin kullanıcıları için rolü manuel olarak ayarla
+      if (userData && userData.email === "batikan@checkday.org") {
+        console.log("Admin e-postası tespit edildi, admin rolü atanıyor");
+        
+        const adminData = {
+          ...userData,
+          role: "admin"
+        };
+        
+        // State'i sadece değişiklik varsa güncelle
+        if (JSON.stringify(user) !== JSON.stringify(adminData)) {
+          setUser(adminData);
+        }
+        
+        // Güncellenmiş kullanıcı bilgilerini önbelleğe al
+        saveToCache(USER_CACHE_KEY, adminData);
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error("Session kontrol hatası:", error);
+      setLoading(false);
+    }
+  };
+
+  // Auth durumunu kontrol et (dışarıdan çağrılan method)
   const checkAuth = async () => {
     try {
       setLoading(true);
@@ -170,6 +370,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     setLoading(true);
+    
+    // Önbelleği temizle
+    localStorage.removeItem(SESSION_CACHE_KEY);
+    localStorage.removeItem(USER_CACHE_KEY);
     
     try {
       // Email/şifre ile giriş
@@ -265,6 +469,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    // Önbelleği temizle
+    localStorage.removeItem(SESSION_CACHE_KEY);
+    localStorage.removeItem(USER_CACHE_KEY);
+    
     // NextAuth çıkışı
     signOut({ redirect: false }).catch(console.error);
     

@@ -216,7 +216,29 @@ const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, account, profile, user }) {
+    async jwt({ token, account, profile, user, trigger }) {
+      // Session update çağrılarını kontrol et - eğer güncelleme varsa her zaman işle
+      if (trigger === "update") {
+        console.log("JWT callback - session update trigger");
+        return token;
+      }
+      
+      // Çok sık JWT oluşturmayı engelle
+      if (token && token.exp && token.jti) {
+        // Token geçerlilik süresi kontrol et - eğer 15 dakikadan fazla süresi varsa token yenileme
+        const currentTime = Math.floor(Date.now() / 1000);
+        const tokenExpiryTime = token.exp as number;
+        
+        // Token'ın en az 15 dakikalık ömrü kalmışsa yeniden oluşturma
+        if (tokenExpiryTime - currentTime > 15 * 60) {
+          console.log("JWT - Token geçerli, yenileme atlanıyor");
+          // Önceki JTI'yı koru, token'ı yenileme
+          return token;
+        }
+        
+        console.log("JWT - Token yenileniyor (15 dakikadan az kaldı)");
+      }
+      
       if (account && profile) {
         token.id = token.sub;
         token.role = "user"; // Varsayılan olarak user rolü
@@ -404,6 +426,7 @@ const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 gün
+    updateAge: 24 * 60 * 60, // 24 saat (token yenileme aralığı)
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {

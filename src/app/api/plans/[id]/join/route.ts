@@ -1,101 +1,96 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
-import Plan from '@/models/Plan';
-import User from '@/models/User';
-import mongoose from 'mongoose';
-import { isValidObjectId } from '@/lib/utils';
+import { ObjectId } from 'mongodb';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
-export async function POST(req: NextRequest) {
+// Global değişken tipini tanımla
+declare global {
+  var mongoClient: any;
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    await connectDB();
-    
-    // URL'den ID'yi al
-    const url = new URL(req.url);
-    const segments = url.pathname.split('/');
-    const id = segments[segments.length - 2]; // /api/plans/[id]/join formatında
-    
-    // Body'den kullanıcı ID'sini al
-    const body = await req.json();
-    const { userId } = body;
-    
-    if (!id) {
-      return NextResponse.json({ error: 'Plan ID zorunludur' }, { status: 400 });
-    }
-    
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+
     if (!userId) {
-      return NextResponse.json({ error: 'Kullanıcı ID zorunludur' }, { status: 400 });
+      return NextResponse.json({ error: 'Oturum açmanız gerekiyor' }, { status: 401 });
     }
-    
-    // Geçerli bir MongoDB ObjectId mi kontrol et
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+
+    const { userId: requestUserId } = await request.json();
+
+    // Kullanıcı kimliğini doğrula
+    if (userId !== requestUserId) {
+      return NextResponse.json({ error: 'Kullanıcı kimliği geçersiz' }, { status: 403 });
+    }
+
+    await connectDB();
+    const planId = params.id;
+
+    // Plan ID geçerli mi kontrol et
+    if (!ObjectId.isValid(planId)) {
       return NextResponse.json({ error: 'Geçersiz plan ID' }, { status: 400 });
     }
-    
-    // Planı bul
-    const plan = await Plan.findById(id);
-    
+
+    const db = global.mongoClient.db();
+
+    // Plan bilgilerini getir
+    const plan = await db.collection('plans').findOne({
+      _id: new ObjectId(planId)
+    });
+
     if (!plan) {
       return NextResponse.json({ error: 'Plan bulunamadı' }, { status: 404 });
     }
-    
-    // Zaten katılmış mı kontrol et
-    const isParticipant = plan.participants?.some(
-      (participantId: any) => 
-        participantId.toString() === userId || 
-        participantId === userId
-    ) || false;
-    
+
+    // Kullanıcı zaten katılımcı mı kontrol et
+    const isParticipant = plan.participants?.some((p: any) => 
+      p?.toString() === userId || 
+      (p?._id && p._id.toString() === userId)
+    );
+
     if (isParticipant) {
-      return NextResponse.json(
-        { error: 'Bu plana zaten katılmışsınız' }, 
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Zaten bu plana katılım sağladınız' }, { status: 400 });
     }
-    
-    // Plan kapasitesi dolmuş mu kontrol et
-    if (plan.maxParticipants > 0 && (plan.participants?.length || 0) >= plan.maxParticipants) {
-      return NextResponse.json(
-        { error: 'Plan kapasitesi dolmuş, katılım alınamıyor' }, 
-        { status: 400 }
-      );
+
+    // Plan dolmuş mu kontrol et
+    if (plan.maxParticipants && plan.participants?.length >= plan.maxParticipants) {
+      return NextResponse.json({ error: 'Plan kontenjanı dolmuştur' }, { status: 400 });
     }
-    
-    // Kullanıcıyı bul
-    let userObjId;
-    if (isValidObjectId(userId)) {
-      userObjId = new mongoose.Types.ObjectId(userId);
-    } else {
-      // Google ID kullanıcısı
-      const user = await User.findOne({ oauth_id: userId });
-      if (user) {
-        userObjId = user._id;
-      } else {
-        return NextResponse.json(
-          { error: 'Kullanıcı bulunamadı' },
-          { status: 404 }
-        );
+
+    // Update operations - plana katılan kişilerin takvimine otomatik olarak ekle
+    const updateData = {
+      $addToSet: { 
+        participants: new ObjectId(userId),
+        calendarUsers: new ObjectId(userId) // Otomatik olarak takvime de ekle
       }
+    };
+
+    // Katılımcı olarak ekle ve otomatik takvime ekle
+    const result = await db.collection('plans').updateOne(
+      { _id: new ObjectId(planId) },
+      updateData
+    );
+
+    if (result.modifiedCount === 0) {
+      return NextResponse.json({ error: 'Plan güncellenemedi' }, { status: 500 });
     }
-    
-    // Plan'a katılımcı ekle
-    await Plan.findByIdAndUpdate(
-      id, 
-      { $addToSet: { participants: userObjId } }
+
+    // Kullanıcının katıldığı planları güncelle
+    await db.collection('users').updateOne(
+      { _id: new ObjectId(userId) },
+      { $addToSet: { participatedPlans: new ObjectId(planId) } }
     );
-    
-    // User'ın participatingPlans alanına da ekle
-    await User.findByIdAndUpdate(
-      userObjId,
-      { $addToSet: { participatingPlans: id } }
-    );
-    
-    return NextResponse.json({ 
-      message: 'Plana başarıyla katıldınız', 
-      participantCount: (plan.participants?.length || 0) + 1
+
+    return NextResponse.json({
+      message: 'Plana başarıyla katıldınız'
     });
-    
   } catch (error: any) {
-    console.error('Plan katılım hatası:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Plan katılımında hata:', error);
+    return NextResponse.json({ error: error.message || 'Bir hata oluştu' }, { status: 500 });
   }
 } 

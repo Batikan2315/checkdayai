@@ -377,7 +377,7 @@ export default function CreatePlan() {
   };
 
   return (
-    <PageContainer title="yeni plan oluştur">
+    <PageContainer>
       <Card>
         <form onSubmit={handleSubmit}>
           <CardBody className="space-y-6">

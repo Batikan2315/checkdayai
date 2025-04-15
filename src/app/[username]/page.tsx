@@ -30,8 +30,24 @@ export default function UserProfile() {
         const cleanUsername = usernameParam.replace('@', '').toLowerCase();
         console.log(`Parametre: ${usernameParam}, Temizlenmiş username: ${cleanUsername}`);
         
+        // Geçersiz veya sistem sayfaları için önlem
+        if (cleanUsername === "giris" || cleanUsername === "login" || cleanUsername === "register") {
+          console.log("Geçersiz profil sayfası:", cleanUsername);
+          setLoading(false);
+          setUser(null);
+          return;
+        }
+        
         // API uç noktasını kullanarak kullanıcı bilgilerini getir
-        const response = await fetch(`/api/user/profile?username=${cleanUsername}`);
+        const response = await fetch(`/api/user/profile?username=${cleanUsername}`, {
+          // Önbelleği devre dışı bırak
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+          }
+        });
         
         if (!response.ok) {
           throw new Error("Kullanıcı bulunamadı");

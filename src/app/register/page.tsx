@@ -7,6 +7,7 @@ import Link from "next/link";
 import RegisterForm from "./RegisterForm";
 import { Card, CardHeader, CardBody, CardFooter } from "@/components/ui/Card";
 import { FaUserPlus } from "react-icons/fa";
+import { toast } from "react-hot-toast";
 
 export default function Register() {
   const { data: session, status } = useSession();
@@ -45,7 +46,7 @@ export default function Register() {
         <CardFooter className="text-center border-t border-gray-200 py-4">
           <p className="text-gray-600">
             Zaten hesabınız var mı?{" "}
-            <Link href="/giris" className="text-blue-600 hover:text-blue-800 font-medium">
+            <Link href="/login" className="text-blue-600 hover:text-blue-800 font-medium">
               Giriş Yap
             </Link>
           </p>

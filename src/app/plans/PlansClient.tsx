@@ -301,7 +301,21 @@ export default function PlansClient() {
               participantCount={plan.participants?.length || 0}
               likes={plan.likes?.length || 0}
               saves={plan.saves?.length || 0}
-              isJoined={plan.participants?.includes(plan.creator) || false}
+              isJoined={plan.participants?.some(participant => {
+                // Participant ID'sini string'e dönüştür
+                const participantId = typeof participant === 'object' 
+                  ? ('_id' in participant ? participant._id.toString() : String(participant))
+                  : String(participant);
+                
+                // Creator ID'sini string'e dönüştür
+                const creatorId = typeof plan.creator === 'object' 
+                  ? ('_id' in plan.creator ? plan.creator._id.toString() : String(plan.creator))
+                  : typeof plan.creator === 'string' 
+                    ? plan.creator 
+                    : String(plan.creator || '');
+                
+                return participantId === creatorId;
+              }) || false}
             />
           ))}
         </div>

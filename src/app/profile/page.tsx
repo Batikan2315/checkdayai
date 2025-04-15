@@ -19,14 +19,23 @@ const formatCreator = (creator: any) => {
   // Creator tamamen boş veya undefined
   if (!creator) {
     console.log("Creator boş, varsayılan değer kullanılıyor");
-    return { username: 'İsimsiz' };
+    return { 
+      _id: "unknown", 
+      username: 'İsimsiz',
+      profilePicture: '/images/avatars/default.png'
+    };
   }
   
   // Creator doğrudan AuthContext'ten gelen user object
-  if (creator && typeof creator === 'object' && 'username' in creator) {
+  if (creator && typeof creator === 'object') {
+    // username veya name varsa kullan
+    const username = creator.username || creator.name || 'İsimsiz';
+    // _id veya id varsa kullan
+    const id = creator._id || creator.id;
+    
     const formattedCreator = {
-      _id: creator._id || creator.id,
-      username: creator.username || 'İsimsiz',
+      _id: id ? (typeof id === 'object' ? id.toString() : id) : 'unknown',
+      username: username,
       firstName: creator.firstName || '',
       lastName: creator.lastName || '',
       profilePicture: creator.profilePicture || creator.image || '/images/avatars/default.png'
@@ -39,8 +48,9 @@ const formatCreator = (creator: any) => {
   console.log("Creator ID'ye dönüştürülüyor, tip:", typeof creator);
   
   return { 
+    _id: typeof creator === 'string' ? creator : (creator?.toString ? creator.toString() : 'unknown'),
     username: 'İsimsiz', 
-    _id: creator?.toString ? creator.toString() : String(creator)
+    profilePicture: '/images/avatars/default.png'
   };
 };
 

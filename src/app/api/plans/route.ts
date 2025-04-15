@@ -259,15 +259,27 @@ export async function POST(req: NextRequest) {
     
     const finalBody = {
       ...body,
-      leaders: []  // leaders alanını boş dizi olarak ayarla
+      leaders: [],  // leaders alanını boş dizi olarak ayarla
+      isActive: true // Plan aktif olarak ayarla
     };
 
     if (isGoogleId) {
       // Google ID kullanıcısı için oauth_creator_id alanını ayarla
       finalBody.oauth_creator_id = body.creator;
-      finalBody.creator = body.creator; // String olarak sakla
+      
+      // Google ID için kullanıcıyı bul
+      const user = await User.findOne({ oauth_id: body.creator });
+      if (user) {
+        // Bulunan user ile creator'ı ayarla
+        finalBody.creator = user._id;
+        finalBody.leaders = [user._id]; // Liderlere kullanıcı ID'sini ekle
+      } else {
+        // Kullanıcı bulunamadı, string olarak sakla
+        finalBody.creator = body.creator;
+      }
     } else {
-      // Normal MongoDB ObjectId için liderlere ekle
+      // Normal MongoDB ObjectId için creator ve liderlere ekle
+      finalBody.creator = body.creator;
       finalBody.leaders = [body.creator];
     }
     
