@@ -9,11 +9,8 @@ declare global {
   var mongoClient: any;
 }
 
-// Next.js 15.3.0 API route format
-export async function POST(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+// URL'den parametre çıkaran güvenli yöntem kullanılıyor
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
@@ -30,7 +27,11 @@ export async function POST(
     }
 
     await connectDB();
-    const planId = context.params.id;
+    
+    // URL'den plan ID'sini çıkar
+    const url = new URL(request.url);
+    const segments = url.pathname.split('/');
+    const planId = segments[segments.length - 2]; // /api/plans/[id]/join formatında
 
     // Plan ID geçerli mi kontrol et
     if (!ObjectId.isValid(planId)) {
