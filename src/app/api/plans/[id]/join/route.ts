@@ -9,9 +9,10 @@ declare global {
   var mongoClient: any;
 }
 
+// Next.js 15.3.0 API route format
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -29,7 +30,7 @@ export async function POST(
     }
 
     await connectDB();
-    const planId = context.params.id;
+    const planId = params.id;
 
     // Plan ID geçerli mi kontrol et
     if (!ObjectId.isValid(planId)) {

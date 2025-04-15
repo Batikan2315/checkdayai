@@ -2,7 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    serverActions: true,
+    serverActions: {
+      allowedOrigins: ['localhost:3000', 'checkday.ai', '*.netlify.app']
+    },
   },
   images: {
     domains: [
@@ -16,12 +18,6 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   productionBrowserSourceMaps: process.env.NODE_ENV !== 'production',
-  devServer: process.env.NODE_ENV === 'development' ? {
-    https: {
-      key: process.env.SSL_KEY_PATH || './certificates/localhost-key.pem',
-      cert: process.env.SSL_CERT_PATH || './certificates/localhost.pem',
-    }
-  } : undefined,
   headers: async () => {
     return [
       {
