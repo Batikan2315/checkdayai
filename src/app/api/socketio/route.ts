@@ -32,14 +32,19 @@ export async function GET(req: NextRequest) {
             "https://www.checkday.ai"
           ] : "*",
           methods: ["GET", "POST"],
-          credentials: false  // Cookie kullanma
+          credentials: true
         },
-        transports: ['polling', 'websocket'], // Önce polling, sonra WebSocket kullan 
-        pingTimeout: 30000,        // 30 saniye (artırıldı)
-        pingInterval: 25000,       // 25 saniye (artırıldı)
-        connectTimeout: 15000,     // 15 saniye (artırıldı)
-        cookie: false,             // Cookie oluşturma
-        path: '/api/socketio/'    // API path
+        transports: ['polling', 'websocket'], 
+        pingTimeout: 60000,      
+        pingInterval: 30000,     
+        connectTimeout: 30000,  
+        cookie: {
+          name: "io",
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax"
+        },
+        path: '/api/socketio/'
       });
       
       io.on("connection", (socket) => {

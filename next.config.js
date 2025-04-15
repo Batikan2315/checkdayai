@@ -3,8 +3,8 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000', 'checkday.ai', '*.netlify.app']
-    },
+      allowedOrigins: ['localhost:3000', 'checkday.ai', 'www.checkday.ai', '*.vercel.app']
+    }
   },
   images: {
     domains: [

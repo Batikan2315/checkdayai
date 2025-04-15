@@ -1,2 +1,0 @@
-/api/socketio/*  https://checkday.ai/api/socketio/:splat  200
-/socket.io/*   https://checkday.ai/socket.io/:splat  200 
