@@ -39,9 +39,7 @@ export async function GET(req: NextRequest) {
         pingInterval: 25000,       // 25 saniye (artırıldı)
         connectTimeout: 15000,     // 15 saniye (artırıldı)
         cookie: false,             // Cookie oluşturma
-        path: '/api/socketio/',    // API path
-        // SSL yapılandırması - üretimde aktif
-        secure: isProd,
+        path: '/api/socketio/'    // API path
       });
       
       io.on("connection", (socket) => {
