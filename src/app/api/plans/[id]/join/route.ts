@@ -12,7 +12,7 @@ declare global {
 // Next.js 15.3.0 API route format
 export async function POST(
   request: NextRequest,
-  params: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -30,7 +30,7 @@ export async function POST(
     }
 
     await connectDB();
-    const planId = params.params.id;
+    const planId = context.params.id;
 
     // Plan ID geçerli mi kontrol et
     if (!ObjectId.isValid(planId)) {
