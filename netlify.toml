@@ -37,14 +37,20 @@
   force = true
 
 [[redirects]]
-  from = "/socket.io/*"
-  to = "/:splat"
+  from = "/api/auth/*"
+  to = "/.netlify/functions/auth/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/socket.io/*"
+  to = "/:splat"
   status = 200
   force = true
 
@@ -58,6 +64,12 @@
   for = "/_next/*"
   [headers.values]
     Content-Type = "application/javascript"
+    X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/_next/static/css/*"
+  [headers.values]
+    Content-Type = "text/css"
     X-Content-Type-Options = "nosniff"
 
 [[headers]]

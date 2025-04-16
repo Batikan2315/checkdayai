@@ -13,21 +13,28 @@
 
 /_next/static/css/*
   Content-Type: text/css
+  X-Content-Type-Options: nosniff
 
 /_next/static/chunks/*.js
   Content-Type: application/javascript
+  X-Content-Type-Options: nosniff
 
 /_next/static/chunks/app/*.js
   Content-Type: application/javascript
+  X-Content-Type-Options: nosniff
 
 /_next/static/chunks/framework-*.js
   Content-Type: application/javascript
+  X-Content-Type-Options: nosniff
 
 /_next/static/chunks/webpack-*.js
   Content-Type: application/javascript
+  X-Content-Type-Options: nosniff
 
 /_next/static/chunks/main-*.js
   Content-Type: application/javascript
+  X-Content-Type-Options: nosniff
 
 /_next/data/*
-  Content-Type: application/json 
+  Content-Type: application/json
+  X-Content-Type-Options: nosniff 
