@@ -1,10 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'export',
-  images: {
-    unoptimized: true,
-  },
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3000', 'checkday.ai', 'www.checkday.ai', '*.vercel.app']
