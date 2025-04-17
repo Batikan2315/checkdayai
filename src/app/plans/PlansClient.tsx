@@ -29,11 +29,11 @@ const SearchBar = ({ placeholder, onSearch, initialValue, className }: {
         placeholder={placeholder}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        className="flex-grow p-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="flex-grow p-3 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
       />
       <button 
         type="submit"
-        className="bg-blue-600 text-white px-4 py-2 rounded-r-lg hover:bg-blue-700 transition-colors"
+        className="bg-blue-600 text-white px-5 py-3 rounded-r-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
       >
         Ara
       </button>
@@ -60,49 +60,56 @@ const FilterBar = ({
   return (
     <div className="w-full">
       <div className="flex justify-center items-center gap-2 mb-4">
-        <Button 
-          size="sm"
-          variant={filters.isFree === "true" ? "primary" : "outline"}
+        <button 
           onClick={() => onFilterChange('isFree', filters.isFree === "true" ? "" : "true")}
-          className="min-w-[100px]"
+          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+            filters.isFree === "true" 
+              ? 'bg-blue-100 text-blue-700 border-2 border-blue-300' 
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+          }`}
         >
           Ücretsiz
-        </Button>
-        <Button 
-          size="sm"
-          variant={filters.isFree === "false" ? "primary" : "outline"}
+        </button>
+        <button 
           onClick={() => onFilterChange('isFree', filters.isFree === "false" ? "" : "false")}
-          className="min-w-[100px]"
+          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+            filters.isFree === "false" 
+              ? 'bg-blue-100 text-blue-700 border-2 border-blue-300' 
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+          }`}
         >
           Ücretli
-        </Button>
-        <Button 
-          size="sm"
-          variant={filters.isOnline === "true" ? "primary" : "outline"}
+        </button>
+        <button 
           onClick={() => onFilterChange('isOnline', filters.isOnline === "true" ? "" : "true")}
-          className="min-w-[100px]"
+          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+            filters.isOnline === "true" 
+              ? 'bg-blue-100 text-blue-700 border-2 border-blue-300' 
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+          }`}
         >
           Online
-        </Button>
-        <Button 
-          size="sm"
-          variant={filters.isOnline === "false" ? "primary" : "outline"}
+        </button>
+        <button 
           onClick={() => onFilterChange('isOnline', filters.isOnline === "false" ? "" : "false")}
-          className="min-w-[100px]"
+          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+            filters.isOnline === "false" 
+              ? 'bg-blue-100 text-blue-700 border-2 border-blue-300' 
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+          }`}
         >
           Yüz Yüze
-        </Button>
+        </button>
       </div>
       
       {activeFiltersCount > 0 && (
         <div className="flex justify-center mt-1 mb-2">
-          <Button 
-            size="sm" 
-            variant="outline" 
+          <button 
             onClick={onClearFilters}
+            className="px-4 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors border border-gray-300"
           >
             Filtreleri Temizle
-          </Button>
+          </button>
         </div>
       )}
     </div>

@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Card, CardBody, CardHeader } from "./Card";
-import Button from "./Button";
-import { FaCalendarAlt, FaMapMarkerAlt, FaHeart, FaRegHeart, FaBookmark, FaRegBookmark, FaShare, FaUsers, FaImage, FaUser } from "react-icons/fa";
+"use client";
+
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { FaCalendarAlt, FaMapMarkerAlt, FaHeart, FaRegHeart, FaBookmark, FaRegBookmark, FaUsers, FaImage } from "react-icons/fa";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { toast } from "react-hot-toast";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { PlanActions } from "@/components/PlanActions";
+import Image from "next/image";
 
 interface CreatorInfo {
   _id?: string;
@@ -17,6 +17,7 @@ interface CreatorInfo {
   image?: string;
   googleProfilePicture?: string;
   name?: string;
+  email?: string;
 }
 
 interface PlanCardProps {
@@ -36,13 +37,13 @@ interface PlanCardProps {
   saves?: number;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
-  onShare?: (id: string) => void;
   onClick?: () => void;
   onJoin?: (id: string) => void;
   isJoined?: boolean;
+  showActions?: boolean;
 }
 
-export default function PlanCard({
+const PlanCard = ({
   id,
   title,
   description,
@@ -59,11 +60,11 @@ export default function PlanCard({
   saves = 0,
   onLike,
   onSave,
-  onShare,
   onClick,
   onJoin,
   isJoined = false,
-}: PlanCardProps) {
+  showActions = true,
+}: PlanCardProps) => {
   // Görüntü hatası durumunu izleme
   const [imgError, setImgError] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
@@ -74,7 +75,6 @@ export default function PlanCard({
   const [saveCount, setSaveCount] = useState(saves);
   const [liking, setLiking] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
   
   // Creator bilgileri için değerler
   const creatorName = useMemo(() => {
@@ -100,20 +100,6 @@ export default function PlanCard({
     return `@${creator.username}`;
   }, [creator]);
   
-  const creatorAvatar = useMemo(() => {
-    if (!creator) return `/images/avatars/default.png`;
-    
-    if (creator.profilePicture) {
-      return creator.profilePicture;
-    }
-    
-    if (creator.image) {
-      return creator.image;
-    }
-    
-    return `/images/avatars/default.png`;
-  }, [creator]);
-  
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const isOwner = userId && creator && (
@@ -123,14 +109,8 @@ export default function PlanCard({
   );
   const router = useRouter();
   
-  // Kullanıcının beğeni ve kaydetme durumunu kontrol et
-  useEffect(() => {
-    if (userId) {
-      checkUserInteractions();
-    }
-  }, [userId, id]);
-  
-  const checkUserInteractions = async () => {
+  // API isteklerini optimize ediyoruz
+  const checkUserInteractions = useCallback(async () => {
     try {
       const response = await fetch(`/api/plans/${id}`);
       if (response.ok) {
@@ -172,15 +152,20 @@ export default function PlanCard({
         setSaveCount(plan.saves?.length || 0);
       }
     } catch (error) {
-      console.error("Plan etkileşimlerini kontrol ederken hata:", error);
+      // Sessiz hata yönetimi - API hatasını kullanıcıya bildirmiyoruz
     }
-  };
+  }, [id, userId]);
+  
+  // Kullanıcının beğeni ve kaydetme durumunu kontrol et
+  useEffect(() => {
+    if (userId) {
+      checkUserInteractions();
+    }
+  }, [userId, checkUserInteractions]);
   
   // Plan görüntüsü yüklenirken hata olursa
   const handleImageError = () => {
-    console.error("Plan resmi yüklenemedi, plan ID:", id);
     setImgError(true);
-    console.log("Plan resmi yüklenemedi, varsayılan resim gösteriliyor");
   };
 
   const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
@@ -199,7 +184,7 @@ export default function PlanCard({
     else router.push(`/plan/${id}`);
   };
 
-  // Varsayılan katılma fonksiyonu
+  // Katılma fonksiyonu
   const handleJoin = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -208,13 +193,18 @@ export default function PlanCard({
       return;
     }
     
-    if (isJoined) return;
+    if (isJoined) {
+      // Zaten katıldıysa, doğrudan plan odasına git
+      router.push(`/plan/${id}`);
+      return;
+    }
     
     try {
       setJoining(true);
       
       if (onJoin) {
         onJoin(id);
+        router.push(`/plan/${id}`);
       } else {
         // Varsayılan olarak API çağrısı yap
         const response = await fetch(`/api/plans/${id}/join`, {
@@ -234,21 +224,14 @@ export default function PlanCard({
         
         toast.success('Plana başarıyla katıldınız!');
         
-        // Sayfayı yenile veya durum güncelle
-        window.location.reload();
+        // Katıldıktan sonra plan odasına yönlendir
+        router.push(`/plan/${id}`);
       }
     } catch (error: any) {
       toast.error(error.message || 'Plana katılırken bir hata oluştu');
-      console.error('Katılma hatası:', error);
     } finally {
       setJoining(false);
     }
-  };
-
-  // Plan Odasına gitme işlevi
-  const handleGoToRoom = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    router.push(`/plan/${id}`);
   };
 
   // Beğenme işlevi
@@ -337,72 +320,111 @@ export default function PlanCard({
     }
   };
 
-  // Avatar resmi için yardımcı fonksiyon
-  const getAvatarUrl = () => {
-    if (!creator) return `/images/avatars/default.png`;
-    
-    if (typeof creator === 'object') {
-      // İlk tercih: profil resmi
-      if (creator.profilePicture) return creator.profilePicture;
-      
-      // İkinci tercih: Google profil resmi
-      if (creator.googleProfilePicture) return creator.googleProfilePicture;
-      
-      // Üçüncü tercih: image alanı (NextAuth)
-      if (creator.image) return creator.image;
-    }
-    
-    // Varsayılan resim
-    return `/images/avatars/default.png`;
-  };
-
-  // Kullanıcı adını belirleme yardımcı fonksiyonu
-  const getCreatorName = (creator: CreatorInfo | null | undefined) => {
-    if (!creator) return "Bilinmeyen";
-    
-    // Kullanıcı adı varsa göster
-    if (creator.username) return creator.username;
-    
-    // İsim ve soyisim varsa göster
-    if (creator.firstName && creator.lastName) 
-      return `${creator.firstName} ${creator.lastName}`;
-    
-    // Sadece isim varsa
-    if (creator.firstName) return creator.firstName;
-    
-    // NextAuth name özelliği varsa
-    if (creator.name) return creator.name;
-    
-    // ID'si varsa göster
-    if (creator._id) return creator._id;
-    
-    return "Bilinmeyen";
-  };
-
   // Profil resmi için güvenli kontrol
   const getCreatorImage = (creator: CreatorInfo | null | undefined) => {
     if (!creator) return "/images/avatars/default.png";
     
+    // NextAuth image özelliği
+    if (creator.image) return creator.image;
+    
     // Profil resmi varsa
     if (creator.profilePicture) return creator.profilePicture;
     
-    // Google'dan gelen resim
-    if (creator.image) return creator.image;
+    // Google profil resmi
+    if (creator.googleProfilePicture) return creator.googleProfilePicture;
+    
+    // Gravatar veya varsayılan
+    if (creator.email) {
+      // Gravatar URL'sini oluştur
+      const emailHash = creator.email.trim().toLowerCase();
+      return `https://www.gravatar.com/avatar/${emailHash}?d=mp&s=200`;
+    }
     
     return "/images/avatars/default.png";
   };
 
+  // Avatar URL'sini al ve hata durumlarını yönet
+  const getAvatarUrl = () => {
+    if (avatarError) return "/images/avatars/default.png";
+    return getCreatorImage(creator);
+  };
+
   return (
-    <div className="cursor-pointer h-full">
-      <Card className="overflow-hidden h-full flex flex-col hover:shadow-lg transition-shadow duration-300">
-        <div onClick={handleClickDetails} className="flex flex-col h-full">
-          <CardHeader className="p-0">
-            {/* Creator bilgisi - Instagram benzeri başlık */}
-            <div className="px-3 py-2 flex items-center border-b border-gray-100">
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center">
-                  <div 
-                    className="w-8 h-8 rounded-full overflow-hidden mr-3 cursor-pointer"
+    <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer">
+      <div onClick={handleClickDetails} className="relative">
+        {/* Plan Resmi */}
+        <div className="relative h-48 w-full overflow-hidden bg-gray-100">
+          {imageUrl && !imgError ? (
+            <Image 
+              src={imageUrl}
+              alt={title}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              priority
+              className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
+              onError={handleImageError}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full w-full bg-gradient-to-r from-blue-50 to-indigo-50">
+              <FaImage className="h-16 w-16 text-gray-300" aria-hidden="true" />
+            </div>
+          )}
+          
+          {/* Kategoriler ve Fiyat - Resim üzerinde */}
+          <div className="absolute bottom-0 right-0 left-0 flex justify-between items-center p-2 bg-gradient-to-t from-gray-900/70 to-transparent">
+            <div className="flex gap-1">
+              {isOnline && (
+                <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
+                  Online
+                </span>
+              )}
+              {maxParticipants && (
+                <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-0.5 rounded flex items-center">
+                  <FaUsers className="mr-1 text-xs" aria-hidden="true" />
+                  <span>{participantCount}/{maxParticipants}</span>
+                </span>
+              )}
+            </div>
+            <div>
+              {isFree ? (
+                <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded">
+                  Ücretsiz
+                </span>
+              ) : (
+                <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded">
+                  {formatCurrency(price)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      
+        <div className="p-4">
+          <div className="flex justify-between items-start mb-2">
+            <div 
+              className="flex items-center gap-2" 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (creator?.username) {
+                  router.push(`/@${creator.username}`);
+                }
+              }}
+            >
+              <div className="relative w-8 h-8 rounded-full overflow-hidden border border-gray-300">
+                <Image
+                  src={getAvatarUrl()}
+                  alt={creatorName}
+                  fill
+                  sizes="32px"
+                  className="object-cover"
+                  onError={handleAvatarError}
+                />
+              </div>
+              <div>
+                <p className="font-medium text-sm text-gray-900">{creatorName}</p>
+                {creatorUsername && (
+                  <span 
+                    className="text-xs text-gray-500 hover:text-blue-500 hover:underline cursor-pointer" 
                     onClick={(e) => {
                       e.stopPropagation();
                       if (creator?.username) {
@@ -410,151 +432,76 @@ export default function PlanCard({
                       }
                     }}
                   >
-                    <img 
-                      src={getAvatarUrl()}
-                      alt={getCreatorName(creator)}
-                      className="w-full h-full object-cover"
-                      onError={handleAvatarError}
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="font-medium text-sm text-gray-900 dark:text-white">
-                      {getCreatorName(creator)}
-                    </span>
-                    {creatorUsername && (
-                      <span 
-                        className="text-xs text-gray-500 hover:text-blue-500 hover:underline cursor-pointer" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (creator?.username) {
-                            router.push(`/@${creator.username}`);
-                          }
-                        }}
-                      >
-                        {creatorUsername}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {isOwner && (
-                  <span className="ml-auto bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-300">
-                    Lider
+                    {creatorUsername}
                   </span>
                 )}
               </div>
             </div>
-            
-            {/* Plan görüntüsü - Optimize boyut */}
-            <div 
-              className="relative h-40 w-full overflow-hidden cursor-pointer" 
-              onClick={handleClickDetails}
-            >
-              {imageUrl && !imgError ? (
-                <img
-                  src={imageUrl}
-                  alt={title}
-                  className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                  onError={handleImageError}
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gray-200">
-                  <FaImage className="h-10 w-10 text-gray-400" />
-                </div>
-              )}
+            {isOwner && (
+              <span className="ml-auto bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                Lider
+              </span>
+            )}
+          </div>
+
+          <h3 className="font-bold text-xl mb-2 text-gray-900 line-clamp-2">{title}</h3>
+          <p className="text-gray-700 mb-4 text-sm line-clamp-2">{description}</p>
+
+          <div className="flex items-center justify-between text-gray-500 text-sm">
+            <div className="flex items-center gap-1">
+              <FaCalendarAlt className="text-blue-500" aria-hidden="true" />
+              <span>{formatDate(date.toISOString())}</span>
             </div>
-          </CardHeader>
-          
-          <CardBody className="p-4 flex-grow flex flex-col">
-            {/* Plan bilgileri */}
-            <div onClick={handleClickDetails} className="cursor-pointer mb-2">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 truncate">{title}</h3>
-              <p className="text-sm text-gray-600 line-clamp-2 mb-2">{description}</p>
-              
-              <div className="space-y-1 text-xs text-gray-500">
-                <div className="flex items-center">
-                  <FaCalendarAlt className="mr-1 h-3 w-3 flex-shrink-0" />
-                  <span className="truncate">{formatDate(date)}</span>
-                </div>
-                
-                <div className="flex items-center">
-                  <FaMapMarkerAlt className="mr-1 h-3 w-3 flex-shrink-0" />
-                  <span className="truncate">{isOnline ? "Online Plan" : location}</span>
-                </div>
-                
-                <div className="flex items-center">
-                  <FaUsers className="mr-1 h-3 w-3 flex-shrink-0" />
-                  <span>{participantCount || 0} katılımcı {maxParticipants && maxParticipants > 0 ? `/ ${maxParticipants}` : ''}</span>
-                </div>
-              </div>
+            <div className="flex items-center gap-1">
+              <FaMapMarkerAlt className="text-green-500" aria-hidden="true" />
+              <span className="truncate max-w-[120px]">{isOnline ? "Online Plan" : location}</span>
             </div>
-            
-            {/* Fiyat bilgisi ve katılma butonu */}
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                {isFree ? (
-                  <span className="text-xs text-green-600 font-medium">Ücretsiz</span>
-                ) : (
-                  <span className="text-xs text-primary font-medium">{formatCurrency(price)}</span>
-                )}
-              </div>
-              
-              {/* Katıl/Katıldınız veya Plan Odası butonu */}
-              <div className="mt-auto pt-4">
-                <PlanActions plan={{ _id: id, participants: [], creator: creator }} />
-              </div>
-            </div>
-            
-            {/* Instagram benzeri buton düzeni */}
-            <div className="border-t pt-2">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-4">
-                  <button 
-                    onClick={handleLike}
-                    disabled={liking}
-                    className={`${userLiked ? 'text-red-500' : 'text-gray-500'} hover:text-red-500 flex items-center`}
-                    aria-label="Beğen"
-                  >
-                    {userLiked ? (
-                      <FaHeart className="h-5 w-5 mr-1" />
-                    ) : (
-                      <FaRegHeart className="h-5 w-5 mr-1" />
-                    )}
-                    <span className="text-xs">{likeCount}</span>
-                  </button>
-                  
-                  <button 
-                    onClick={handleSave}
-                    disabled={saving}
-                    className={`${userSaved ? 'text-blue-500' : 'text-gray-500'} hover:text-blue-500`}
-                    aria-label="Kaydet"
-                  >
-                    {userSaved ? (
-                      <FaBookmark className="h-5 w-5" />
-                    ) : (
-                      <FaRegBookmark className="h-5 w-5" />
-                    )}
-                  </button>
-                  
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // URL'yi panoya kopyala
-                      const shareUrl = `${window.location.origin}/plan/${id}`;
-                      navigator.clipboard.writeText(shareUrl)
-                        .then(() => toast.success('Paylaşım bağlantısı kopyalandı'))
-                        .catch(() => toast.error('Bağlantı kopyalanırken hata oluştu'));
-                    }}
-                    className="text-gray-500 hover:text-blue-500"
-                    aria-label="Paylaş"
-                  >
-                    <FaShare className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </CardBody>
+          </div>
         </div>
-      </Card>
+      </div>
+      
+      {showActions && (
+        <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <button 
+                onClick={handleLike}
+                disabled={liking}
+                className="flex items-center text-gray-500 hover:text-red-500 transition-colors"
+                aria-label={userLiked ? "Beğeniyi kaldır" : "Beğen"}
+                aria-pressed={userLiked}
+              >
+                {userLiked ? <FaHeart className="text-red-500" aria-hidden="true" /> : <FaRegHeart aria-hidden="true" />}
+                <span className="ml-1 text-xs">{likeCount > 0 ? likeCount : ''}</span>
+              </button>
+              <button 
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center text-gray-500 hover:text-blue-500 transition-colors"
+                aria-label={userSaved ? "Kaydetmeyi kaldır" : "Kaydet"}
+                aria-pressed={userSaved}
+              >
+                {userSaved ? <FaBookmark className="text-blue-500" aria-hidden="true" /> : <FaRegBookmark aria-hidden="true" />}
+                <span className="ml-1 text-xs">{saveCount > 0 ? saveCount : ''}</span>
+              </button>
+            </div>
+            <button
+              onClick={handleJoin}
+              disabled={joining}
+              className={`py-1 px-3 rounded-full text-sm font-medium transition-colors ${
+                isJoined || isOwner 
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              }`}
+              aria-label={isJoined || isOwner ? "Plana Git" : "Katıl"}
+            >
+              {joining ? 'Katılıyor...' : isJoined || isOwner ? 'Plana Git' : 'Katıl'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+};
+
+export default PlanCard; 

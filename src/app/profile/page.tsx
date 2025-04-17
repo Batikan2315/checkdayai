@@ -886,68 +886,107 @@ export default function Profile() {
   );
 
   return (
-    <PageContainer>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <div className="flex whitespace-nowrap overflow-x-auto">
-              <button
-                className={`flex items-center px-4 py-3 text-sm font-medium ${
-                  activeTab === "profile" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-                }`}
-                onClick={() => setActiveTab("profile")}
+    <>
+      {needsSetup ? (
+        <WelcomeSetup onComplete={handleSetupComplete} />
+      ) : (
+        <PageContainer>
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Sol menü */}
+            <div className="w-full md:w-64 md:min-w-64 md:max-h-[calc(100vh-16rem)] sticky top-24">
+              <Card className="overflow-hidden">
+                <CardHeader className="p-0">
+                  <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-24 relative">
+                    <div 
+                      className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 w-24 h-24 rounded-full border-4 border-white overflow-hidden bg-white cursor-pointer"
+                      onClick={handleProfilePictureClick}
+                    >
+                      <div className="relative w-full h-full">
+                        <img 
+                          src={user?.profilePicture || DEFAULT_AVATAR} 
+                          alt="Profil Fotoğrafı" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 flex items-center justify-center transition-all">
+                          <FaCamera className="text-white opacity-0 hover:opacity-100 text-xl" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardBody className="pt-16 pb-4">
+                  <h2 className="text-lg font-bold text-center mb-1">
+                    {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.username}
+                  </h2>
+                  <p className="text-sm text-gray-500 text-center mb-4">@{user?.username}</p>
+                  
+                  <div className="space-y-2 mt-4">
+                    <button 
+                      className={`flex items-center gap-2 p-2 w-full rounded-md transition-colors ${
+                        activeTab === "profile" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"
+                      }`}
+                      onClick={() => setActiveTab("profile")}
+                    >
+                      <FaUser className="text-blue-600" /> Profilim
+                    </button>
+                    <button 
+                      className={`flex items-center gap-2 p-2 w-full rounded-md transition-colors ${
+                        activeTab === "plans" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"
+                      }`}
+                      onClick={() => setActiveTab("plans")}
+                    >
+                      <FaCalendarAlt className="text-green-600" /> Planlarım
+                    </button>
+                    <button 
+                      className={`flex items-center gap-2 p-2 w-full rounded-md transition-colors ${
+                        activeTab === "saved" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"
+                      }`}
+                      onClick={() => setActiveTab("saved")}
+                    >
+                      <FaBookmark className="text-purple-600" /> Kaydedilenler
+                    </button>
+                    <button 
+                      className={`flex items-center gap-2 p-2 w-full rounded-md transition-colors ${
+                        activeTab === "likes" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"
+                      }`}
+                      onClick={() => setActiveTab("likes")}
+                    >
+                      <FaHeart className="text-red-600" /> Beğendiklerim
+                    </button>
+                    <button 
+                      className={`flex items-center gap-2 p-2 w-full rounded-md transition-colors ${
+                        activeTab === "wallet" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"
+                      }`}
+                      onClick={() => setActiveTab("wallet")}
+                    >
+                      <FaWallet className="text-amber-600" /> Cüzdanım
+                    </button>
+                    <button 
+                      className={`flex items-center gap-2 p-2 w-full rounded-md transition-colors ${
+                        activeTab === "notifications" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"
+                      }`}
+                      onClick={() => setActiveTab("notifications")}
+                    >
+                      <FaBell className="text-blue-600" /> Bildirimler
+                    </button>
+                  </div>
+                </CardBody>
+              </Card>
+              
+              <Button 
+                variant="outline" 
+                className="w-full mt-4 text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200"
+                onClick={logout}
               >
-                <FaUser className="mr-2" />
-                <span>Profil</span>
-              </button>
-              <button
-                className={`flex items-center px-4 py-3 text-sm font-medium ${
-                  activeTab === "plans" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-                }`}
-                onClick={() => setActiveTab("plans")}
-              >
-                <FaCalendarAlt className="mr-2" />
-                <span>Planlarım</span>
-              </button>
-              <button
-                className={`flex items-center px-4 py-3 text-sm font-medium ${
-                  activeTab === "saved" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-                }`}
-                onClick={() => setActiveTab("saved")}
-              >
-                <FaBookmark className="mr-2" />
-                <span>Kaydedilenler</span>
-              </button>
-              <button
-                className={`flex items-center px-4 py-3 text-sm font-medium ${
-                  activeTab === "likes" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-                }`}
-                onClick={() => setActiveTab("likes")}
-              >
-                <FaHeart className="mr-2" />
-                <span>Beğenilenler</span>
-              </button>
-              <button
-                className={`flex items-center px-4 py-3 text-sm font-medium ${
-                  activeTab === "wallet" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-                }`}
-                onClick={() => setActiveTab("wallet")}
-              >
-                <FaWallet className="mr-2" />
-                <span>Cüzdan</span>
-              </button>
-              <button
-                className={`flex items-center px-4 py-3 text-sm font-medium ${
-                  activeTab === "notifications" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-blue-600"
-                }`}
-                onClick={() => setActiveTab("notifications")}
-              >
-                <FaBell className="mr-2" />
-                <span>Bildirimler</span>
-              </button>
+                <span>Çıkış Yap</span>
+              </Button>
             </div>
-
-            <div className="p-4">
+            
+            {/* Ana içerik */}
+            <div className="flex-1">
               {activeTab === "profile" && renderProfileTab()}
               {activeTab === "plans" && renderPlansTab()}
               {activeTab === "saved" && renderSavedPlansTab()}
@@ -956,8 +995,43 @@ export default function Profile() {
               {activeTab === "notifications" && renderNotificationsTab()}
             </div>
           </div>
+        </PageContainer>
+      )}
+      
+      {/* Bakiye yükleme modalı */}
+      {isDepositModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-4">Bakiye Yükle</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Tutar (₺)</label>
+              <input
+                type="number"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                placeholder="0"
+                min="1"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsDepositModalOpen(false)}
+                disabled={depositLoading}
+              >
+                İptal
+              </Button>
+              <Button 
+                onClick={handleDeposit}
+                disabled={depositLoading || !depositAmount}
+              >
+                {depositLoading ? "Yükleniyor..." : "Yükle"}
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
-    </PageContainer>
+      )}
+    </>
   );
 } 

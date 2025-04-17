@@ -70,11 +70,11 @@ export default function useNotifications() {
       clearTimeout(debounceTimerRef.current);
     }
     
-    // Zamanlayıcı kur - 2 saniye bekle
+    // Zamanlayıcı kur - 5 saniye bekle (2 saniyeden artırıldı)
     debounceTimerRef.current = setTimeout(() => {
       fetchNotifications(options);
       debounceTimerRef.current = null;
-    }, 2000);
+    }, 5000);
   }, []);
 
   // Bildirimleri getir
@@ -102,22 +102,22 @@ export default function useNotifications() {
       return;
     }
     
-    // API çağrısı sınırlama
+    // API çağrısı sınırlama - sayacı artır
     apiCallCounter++;
-    if (apiCallCounter > 10 && !issuedApiWarning) {
+    if (apiCallCounter > 5 && !issuedApiWarning) {
       console.warn(`⚠️ Çok fazla API çağrısı yapıldı: ${apiCallCounter}`);
       issuedApiWarning = true;
       
       // Çok fazla istek varsa bir süre engelle
-      if (apiCallCounter > 20 && !options?.force) {
+      if (apiCallCounter > 10 && !options?.force) {
         console.log('Çok fazla istek yapıldı, API istekleri geçici olarak engellendi');
         return;
       }
     }
     
-    // Çok sık yenileme yapılmasını engelle (en az 60 saniye ara ile)
+    // Çok sık yenileme yapılmasını engelle (en az 120 saniye ara ile - 60 saniyeden artırıldı)
     const now = Date.now();
-    if (!options?.force && now - lastFetchRef.current < 60000) {
+    if (!options?.force && now - lastFetchRef.current < 120000) {
       console.log('Çok sık bildirim sorgulaması engellendi');
       return;
     }

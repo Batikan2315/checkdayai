@@ -31,6 +31,7 @@ import {
 } from "react-icons/fa";
 import { BsCalendar } from "react-icons/bs";
 import { PlanActions } from "@/components/PlanActions";
+import Link from "next/link";
 
 // Varsayılan profil resmi için güvenli yol
 const DEFAULT_AVATAR = "/images/avatars/default.png";
@@ -704,14 +705,15 @@ export default function PlanDetail() {
             {plan.saves?.length || 0}
           </Button>
 
-          {/* Plan Odası Butonu - Sadece katılımcılar ve liderler görebilir */}
-          {(isUserJoined || isLeader) && (
-            <Button 
-              variant="outline" 
-              onClick={() => router.push(`/plan/${id}/room`)}
-            >
-              <FaComment className="mr-2" /> Plan Odası
-            </Button>
+          {/* Plan Odası Butonu - Sadece katılımcılar ve oluşturucu görebilir */}
+          {(isParticipant || isCreator) && (
+            <Link href={`/plan/${id}/room`} passHref>
+              <Button 
+                variant="outline"
+              >
+                <FaComment className="mr-2" /> Plan Odası
+              </Button>
+            </Link>
           )}
         </div>
 

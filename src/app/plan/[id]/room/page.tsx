@@ -1,15 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useState, useEffect, useRef, FormEvent, useCallback } from "react";
+import { useParams } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
-import { FaExclamationTriangle, FaArrowLeft } from "react-icons/fa";
+import { FaExclamationTriangle, FaArrowLeft, FaPaperPlane } from "react-icons/fa";
 import Link from "next/link";
-import Input from "@/components/ui/Input";
-import { format } from "date-fns";
-import { tr } from 'date-fns/locale';
+import Image from "next/image";
 
 // Interface tanımları
 interface IMessage {
@@ -20,6 +18,7 @@ interface IMessage {
     _id: string;
     name?: string;
     image?: string;
+    profilePicture?: string;
   };
 }
 
@@ -38,98 +37,108 @@ interface IPlan {
 export default function PlanRoom() {
   const params = useParams();
   const id = params?.id as string;
-  const router = useRouter();
   const { data: session, status } = useSession();
   const [isValid, setIsValid] = useState(true);
   const [plan, setPlan] = useState<IPlan | null>(null);
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(true);
-  const [joining, setJoining] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Mesajların en altına otomatik kaydırma
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Mesajları getiren fonksiyon
+  const fetchMessages = useCallback(async () => {
+    try {
+      setLoadingMessages(true);
+      const response = await fetch(`/api/plans/${id}/messages`);
+      
+      if (!response.ok) {
+        // İlk kez erişiliyorsa mesaj henüz olmayabilir, bu yüzden hata gösterme
+        setMessages([]);
+        setLoadingMessages(false);
+        return;
+      }
+      
+      const data = await response.json();
+      setMessages(data.messages || []);
+      setLoadingMessages(false);
+    } catch (error) {
+      console.error("Mesajlar yüklenirken hata:", error);
+      setLoadingMessages(false);
+    }
+  }, [id]);
+
+  // Erişim kontrolü
+  useEffect(() => {
     const checkAccess = async () => {
+      if (!session?.user) {
+        setLoadingAccess(false);
+        setHasAccess(false);
+        return;
+      }
+
       try {
-        setLoading(true);
-        setError(null);
-        
-        // Oturum kontrolü güncellendi
-        if (status === 'loading') {
-          // Oturum durumu yükleniyor, bekleyin
-          return;
+        const planResponse = await fetch(`/api/plans/${id}`);
+        if (!planResponse.ok) {
+          throw new Error("Plan bulunamadı");
         }
-        
-        if (status === 'unauthenticated') {
-          setIsValid(false);
-          setError('Bu sayfaya erişmek için oturum açmanız gerekiyor.');
-          setLoading(false);
-          return;
-        }
-        
-        // Plan bilgilerini al
-        const res = await fetch(`/api/plans/${id}`);
-        
-        if (!res.ok) {
-          if (res.status === 404) {
-            setIsValid(false);
-            setError('Plan bulunamadı.');
-          } else {
-            throw new Error('Plan bilgileri alınırken bir hata oluştu.');
-          }
-          setLoading(false);
-          return;
-        }
-        
-        const data = await res.json();
-        setPlan(data);
-        
-        // Kullanıcının plana erişim hakkı var mı kontrol et
-        const userId = session?.user?.id;
-        const isCreator = data.creator?._id === userId;
-        const isParticipant = data.participants?.some((p: any) => p._id === userId);
-        const isLeader = data.leaders?.some((l: any) => l._id === userId);
-        
-        if (!isCreator && !isParticipant && !isLeader) {
-          setIsValid(false);
-          setError('Bu plan odasına erişim izniniz yok. Katılımcı veya lider olmanız gerekiyor.');
+
+        const planData = await planResponse.json();
+        setPlan(planData);
+
+        // Kullanıcının katılımcı veya oluşturucu olup olmadığını kontrol et
+        const isUserCreator = planData.creator?._id === session.user.id;
+        const isUserParticipant = planData.participants?.some(
+          (participant: any) => participant.userId === session.user.id && participant.status === "ACCEPTED"
+        );
+
+        if (isUserCreator || isUserParticipant) {
+          setHasAccess(true);
+          fetchMessages();
         } else {
-          // Mesajları getir
-          const messagesRes = await fetch(`/api/plans/${id}/messages`);
-          if (messagesRes.ok) {
-            const messagesData = await messagesRes.json();
-            setMessages(messagesData);
-          }
+          setHasAccess(false);
+          setError("Bu plan odasına erişmek için plana katılmanız gerekmektedir.");
         }
-      } catch (err) {
-        console.error('Error checking access:', err);
-        setError('Bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-        setIsValid(false);
-      } finally {
-        setLoading(false);
+        
+        setLoadingAccess(false);
+      } catch (error) {
+        console.error(error);
+        setError("Plan bilgisi yüklenirken hata oluştu");
+        setLoadingAccess(false);
+        setHasAccess(false);
       }
     };
     
     if (id) {
       checkAccess();
     }
-  }, [id, status, session]);
+  }, [id, status, session, fetchMessages]);
 
-  const handleSendMessage = async () => {
-    if (!session?.user?.id) {
-      toast.error('Mesaj göndermek için giriş yapmalısınız');
+  // Mesaj gönderme
+  const handleSendMessage = async (e: FormEvent) => {
+    e.preventDefault();
+
+    // Mesaj göndermek için katılımcı veya oluşturucu olmalısınız
+    if (!hasAccess) {
+      toast.error("Mesaj göndermek için plana katılmanız gerekmektedir.");
       return;
     }
-    
-    if (!newMessage.trim()) {
-      toast.error('Boş mesaj gönderemezsiniz');
-      return;
-    }
-    
+
+    if (!newMessage.trim()) return;
+
     try {
       setSendingMessage(true);
       
@@ -162,14 +171,15 @@ export default function PlanRoom() {
     }
   };
 
-  const handleJoin = async () => {
+  // Plana katılma
+  const handleJoin = useCallback(async () => {
     if (!session?.user?.id) {
       toast.error('Katılmak için giriş yapmalısınız');
       return;
     }
     
     try {
-      setJoining(true);
+      setLoading(true);
       
       // API'ye katılma isteği gönder
       const response = await fetch(`/api/plans/${id}/join`, {
@@ -201,32 +211,11 @@ export default function PlanRoom() {
       toast.error(error.message || 'Plana katılırken bir hata oluştu');
       console.error('Katılma hatası:', error);
     } finally {
-      setJoining(false);
+      setLoading(false);
     }
-  };
+  }, [session, id, fetchMessages]);
 
-  const fetchMessages = async () => {
-    try {
-      setLoadingMessages(true);
-      const response = await fetch(`/api/plans/${id}/messages`);
-      
-      if (!response.ok) {
-        // İlk kez erişiliyorsa mesaj henüz olmayabilir, bu yüzden hata gösterme
-        setMessages([]);
-        setLoadingMessages(false);
-        return;
-      }
-      
-      const data = await response.json();
-      setMessages(data.messages || []);
-      setLoadingMessages(false);
-    } catch (error) {
-      console.error("Mesajlar yüklenirken hata:", error);
-      setLoadingMessages(false);
-    }
-  };
-
-  if (loading || loadingAccess) {
+  if (loadingAccess) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -240,13 +229,14 @@ export default function PlanRoom() {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-4">
           <Link href={`/plan/${id}`} className="flex items-center text-blue-500 hover:underline">
-            <FaArrowLeft className="mr-2" /> Plana Dön
+            <FaArrowLeft className="mr-2" aria-hidden="true" /> 
+            <span>Plana Dön</span>
           </Link>
         </div>
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4" role="alert">
           <div className="flex">
             <div className="flex-shrink-0">
-              <FaExclamationTriangle className="h-5 w-5 text-yellow-400" />
+              <FaExclamationTriangle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
             </div>
             <div className="ml-3">
               <p className="text-sm text-yellow-700">
@@ -254,6 +244,13 @@ export default function PlanRoom() {
               </p>
             </div>
           </div>
+        </div>
+        <div className="text-center mt-4">
+          <Button
+            onClick={() => window.location.href = "/giris"}
+          >
+            Giriş Yap
+          </Button>
         </div>
       </div>
     );
@@ -264,13 +261,14 @@ export default function PlanRoom() {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-4">
           <Link href={`/plan/${id}`} className="flex items-center text-blue-500 hover:underline">
-            <FaArrowLeft className="mr-2" /> Plana Dön
+            <FaArrowLeft className="mr-2" aria-hidden="true" /> 
+            <span>Plana Dön</span>
           </Link>
         </div>
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4" role="alert">
           <div className="flex">
             <div className="flex-shrink-0">
-              <FaExclamationTriangle className="h-5 w-5 text-yellow-400" />
+              <FaExclamationTriangle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
             </div>
             <div className="ml-3">
               <p className="text-sm text-yellow-700">
@@ -279,6 +277,16 @@ export default function PlanRoom() {
             </div>
           </div>
         </div>
+        {!hasAccess && (
+          <div className="text-center mt-4">
+            <Button
+              onClick={handleJoin}
+              disabled={loading}
+            >
+              {loading ? "Katılınıyor..." : "Plana Katıl"}
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -287,7 +295,8 @@ export default function PlanRoom() {
     <div className="container mx-auto px-4 py-8 min-h-screen">
       <div className="mb-4">
         <Link href={`/plan/${id}`} className="flex items-center text-blue-500 hover:underline">
-          <FaArrowLeft className="mr-2" /> Plana Dön
+          <FaArrowLeft className="mr-2" aria-hidden="true" /> 
+          <span>Plana Dön</span>
         </Link>
       </div>
       
@@ -295,10 +304,10 @@ export default function PlanRoom() {
         <h1 className="text-2xl font-bold mb-2">{plan?.title || 'Plan Odası'}</h1>
         <p className="text-gray-600 mb-6">Plan katılımcıları ile iletişim kurabileceğiniz özel bir alan.</p>
         
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6" role="alert">
           <div className="flex">
             <div className="flex-shrink-0">
-              <FaExclamationTriangle className="h-5 w-5 text-blue-400" />
+              <FaExclamationTriangle className="h-5 w-5 text-blue-400" aria-hidden="true" />
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-700">
@@ -308,75 +317,96 @@ export default function PlanRoom() {
           </div>
         </div>
         
-        {loadingMessages ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
-        ) : messages && messages.length > 0 ? (
-          <div className="space-y-4 mb-6 max-h-96 overflow-y-auto p-2 border border-gray-200 rounded-lg">
-            {messages.map((message: any) => (
-              <div 
-                key={message._id} 
-                className={`flex ${message.user?._id === session?.user?.id ? 'justify-end' : 'justify-start'}`}
-              >
-                <div 
-                  className={`max-w-[70%] p-3 rounded-lg ${
-                    message.user?._id === session?.user?.id 
-                      ? 'bg-blue-100 text-blue-900' 
-                      : 'bg-gray-100 text-gray-900'
-                  }`}
-                >
-                  <div className="flex items-center mb-1">
-                    <div className="w-6 h-6 rounded-full overflow-hidden mr-2">
-                      <img 
-                        src={message.user?.profilePicture || '/images/avatars/default.png'} 
-                        alt={message.user?.name || 'Kullanıcı'} 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/images/avatars/default.png';
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs font-semibold">
-                      {message.user?.name || 'Anonim Kullanıcı'}
-                    </span>
-                    <span className="text-xs text-gray-500 ml-2">
-                      {new Date(message.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </span>
-                  </div>
-                  <p className="text-sm">{message.content}</p>
-                </div>
+        <div className="mb-6 bg-gray-50 border border-gray-200 rounded-lg">
+          <div 
+            className="space-y-4 p-4 max-h-96 overflow-y-auto"
+            aria-live="polite"
+            aria-label="Mesaj alanı"
+          >
+            {loadingMessages ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
               </div>
-            ))}
+            ) : messages && messages.length > 0 ? (
+              messages.map((message) => (
+                <div 
+                  key={message._id} 
+                  className={`flex ${message.user?._id === session?.user?.id ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div 
+                    className={`max-w-[70%] p-3 rounded-lg ${
+                      message.user?._id === session?.user?.id 
+                        ? 'bg-blue-100 text-blue-900' 
+                        : 'bg-gray-100 text-gray-900'
+                    }`}
+                  >
+                    <div className="flex items-center mb-1">
+                      <div className="relative w-6 h-6 rounded-full overflow-hidden mr-2">
+                        <Image 
+                          src={message.user?.profilePicture || message.user?.image || '/images/avatars/default.png'} 
+                          alt={message.user?.name || 'Kullanıcı'}
+                          width={24}
+                          height={24}
+                          className="object-cover"
+                          onError={() => '/images/avatars/default.png'}
+                        />
+                      </div>
+                      <span className="text-xs font-semibold">
+                        {message.user?.name || 'Anonim Kullanıcı'}
+                      </span>
+                      <span className="text-xs text-gray-500 ml-2">
+                        {new Date(message.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                    </div>
+                    <p className="text-sm">{message.content}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>Henüz mesaj yok. İlk mesajı siz gönderin!</p>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500 border border-gray-200 rounded-lg mb-6">
-            <p>Henüz mesaj yok. İlk mesajı siz gönderin!</p>
-          </div>
-        )}
+        </div>
         
-        <div className="flex">
+        <form onSubmit={handleSendMessage} className="flex">
+          <label htmlFor="message-input" className="sr-only">Mesajınızı yazın</label>
           <input
+            id="message-input"
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Mesajınızı yazın..."
             className="flex-grow p-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={sendingMessage}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                handleSendMessage();
+                handleSendMessage(e);
               }
             }}
           />
           <Button
-            onClick={handleSendMessage}
+            type="submit"
             disabled={!newMessage.trim() || sendingMessage}
             className="rounded-l-none"
+            aria-label="Mesaj gönder"
           >
-            {sendingMessage ? 'Gönderiliyor...' : 'Gönder'}
+            {sendingMessage ? (
+              <>
+                <span className="animate-spin mr-2 inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+                <span>Gönderiliyor</span>
+              </>
+            ) : (
+              <>
+                <FaPaperPlane className="mr-2" aria-hidden="true" />
+                <span>Gönder</span>
+              </>
+            )}
           </Button>
-        </div>
+        </form>
       </div>
     </div>
   );
