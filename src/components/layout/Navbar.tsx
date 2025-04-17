@@ -286,9 +286,9 @@ const Navbar: React.FC = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 md:top-0 md:bottom-auto bg-white dark:bg-gray-900 shadow-lg z-50">
-      <div className="container mx-auto p-2">
+      <div className="container mx-auto">
         {/* Masaüstü görünümü */}
-        <div className="hidden md:flex justify-between items-center">
+        <div className="hidden md:flex justify-between items-center p-2">
           <Link
             href="/"
             className="text-xl font-bold text-blue-600 dark:text-blue-400 logo"
@@ -326,9 +326,9 @@ const Navbar: React.FC = () => {
         </div>
 
         {/* Mobil görünümü */}
-        <div className="flex flex-col md:hidden">
+        <div className="md:hidden">
           {/* Mobil üst çubuk - logo ve bildirim */}
-          <div className="flex justify-between items-center pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
+          <div className="top-nav flex justify-between items-center px-4">
             <Link href="/" className="text-lg font-bold text-blue-600 dark:text-blue-400">
               checkday
             </Link>
@@ -340,7 +340,7 @@ const Navbar: React.FC = () => {
           </div>
           
           {/* Mobil alt çubuk - menü öğeleri */}
-          <div className="flex justify-around items-center">
+          <div className="bottom-nav flex justify-around items-center px-4">
             {menuItems.map((item, index) => {
               // Profil için özel koşul: Kullanıcı giriş yapmışsa
               if (item.name === "Profil" && session?.user) {
