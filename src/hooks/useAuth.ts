@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { toast } from "react-hot-toast";
 
 interface User {
   _id: string;
   email: string;
-  name: string;
-  surname: string;
   role: string;
-  profileImage?: string;
+  username: string;
+  firstName?: string;
+  lastName?: string;
+  profilePicture?: string;
+  googleProfilePicture?: string;
 }
 
 export const useAuth = () => {
@@ -17,6 +20,7 @@ export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   const fetchUserData = async () => {
     try {
@@ -33,7 +37,24 @@ export const useAuth = () => {
       }
       
       const data = await response.json();
-      setUser(data.user);
+      
+      if (data && data.authenticated) {
+        setUser(data);
+        
+        // Admin rolünü belirle
+        const isUserAdmin = data.role === "admin";
+        setIsAdmin(isUserAdmin);
+        
+        // Eğer admin ise fakat profilde gösterilmiyorsa kontrol et
+        if (isUserAdmin) {
+          const adminCheckResponse = await fetch('/api/auth/check-admin');
+          const adminData = await adminCheckResponse.json();
+          
+          if (!adminData.isAdmin && adminData.dbRole === "admin") {
+            toast.error("Admin yetkiniz var ancak oturumunuz yenilenmeli. Lütfen çıkış yapıp tekrar giriş yapın.");
+          }
+        }
+      }
     } catch (err) {
       console.error("Kullanıcı bilgileri alınırken hata:", err);
       setError(err instanceof Error ? err.message : "Bilinmeyen bir hata oluştu");
@@ -49,6 +70,7 @@ export const useAuth = () => {
       fetchUserData();
     } else {
       setUser(null);
+      setIsAdmin(false);
       setLoading(false);
     }
   }, [status, session]);
@@ -58,6 +80,6 @@ export const useAuth = () => {
     loading,
     error,
     isAuthenticated: !!user,
-    isAdmin: user?.role === "admin"
+    isAdmin
   };
 }; 

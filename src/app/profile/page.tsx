@@ -8,49 +8,26 @@ import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import PageContainer from "@/components/layout/PageContainer";
 import { getUserPlans, getUserSavedPlans, getUserTransactions, getUserLikedPlans, updateUserBalance } from "@/lib/actions";
-import { IPlan, ITransaction } from "@/lib/types";
+import { IUser, IPlan, ITransaction } from "@/lib/types";
 import { toast } from "react-hot-toast";
 import PlanCard from "@/components/ui/PlanCard";
+import WelcomeSetup from "./WelcomeSetup";
+import { connectDB } from "@/lib/db";
+import { ObjectId } from "mongodb";
 
 const NotificationSettingsLazy = lazy(() => import('@/components/settings/NotificationSettings'));
 
 // Yaratıcı bilgilerini güvenli şekilde format fonksiyonu
 const formatCreator = (creator: any) => {
-  // Creator tamamen boş veya undefined
-  if (!creator) {
-    console.log("Creator boş, varsayılan değer kullanılıyor");
-    return { 
-      _id: "unknown", 
-      username: 'İsimsiz',
-      profilePicture: '/images/avatars/default.png'
-    };
-  }
+  if (!creator) return undefined;
   
-  // Creator doğrudan AuthContext'ten gelen user object
-  if (creator && typeof creator === 'object') {
-    // username veya name varsa kullan
-    const username = creator.username || creator.name || 'İsimsiz';
-    // _id veya id varsa kullan
-    const id = creator._id || creator.id;
-    
-    const formattedCreator = {
-      _id: id ? (typeof id === 'object' ? id.toString() : id) : 'unknown',
-      username: username,
-      firstName: creator.firstName || '',
-      lastName: creator.lastName || '',
-      profilePicture: creator.profilePicture || creator.image || '/images/avatars/default.png'
-    };
-    console.log("Format edilen creator:", formattedCreator);
-    return formattedCreator;
-  }
-  
-  // Creator bir ObjectID veya string
-  console.log("Creator ID'ye dönüştürülüyor, tip:", typeof creator);
-  
-  return { 
-    _id: typeof creator === 'string' ? creator : (creator?.toString ? creator.toString() : 'unknown'),
-    username: 'İsimsiz', 
-    profilePicture: '/images/avatars/default.png'
+  return {
+    _id: creator._id?.toString(),
+    username: creator.username,
+    firstName: creator.firstName,
+    lastName: creator.lastName,
+    profilePicture: creator.profilePicture || creator.image,
+    image: creator.image || creator.profilePicture
   };
 };
 
@@ -79,9 +56,7 @@ export default function Profile() {
     username: "",
     firstName: "",
     lastName: "",
-    email: "",
-    password: "",
-    confirmPassword: ""
+    email: ""
   });
   const [profileEditLoading, setProfileEditLoading] = useState(false);
   
@@ -93,25 +68,33 @@ export default function Profile() {
   // Varsayılan profil resmi için güvenli yol
   const DEFAULT_AVATAR = "/images/avatars/default.png";
 
+  // Profil kurulum kontrolü için state
+  const [needsSetup, setNeedsSetup] = useState(false);
+
   useEffect(() => {
     if (!user && !authLoading) {
-      router.push("/login");
-    } else if (user && user._id) {
-      // İlk yüklemede kullanıcı bilgilerini bir kez yenile
-      const firstLoadKey = `profile_first_load_${user._id}`;
-      const hasLoaded = sessionStorage.getItem(firstLoadKey);
-      
-      if (!hasLoaded) {
-        sessionStorage.setItem(firstLoadKey, 'true');
-        refreshUserData().then(() => {
-          // Planları yükle (ilk yüklemede)
-          if (userPlans.length === 0) {
-            fetchUserPlans();
-          }
-          if (savedPlans.length === 0) {
-            fetchSavedPlans();
-          }
-        });
+      router.push("/giris");
+    } else if (user) {
+      // Google kullanıcısı kurulum ihtiyacına bakılır
+      if ((user as any).needsSetup || (user.provider === 'google' && (!user.firstName || !user.lastName))) {
+        setNeedsSetup(true);
+      } else {
+        // İlk yüklemede kullanıcı bilgilerini bir kez yenile
+        const firstLoadKey = `profile_first_load_${(user as any).id || user._id}`;
+        const hasLoaded = sessionStorage.getItem(firstLoadKey);
+        
+        if (!hasLoaded) {
+          sessionStorage.setItem(firstLoadKey, 'true');
+          refreshUserData().then(() => {
+            // Planları yükle (ilk yüklemede)
+            if (userPlans.length === 0) {
+              fetchUserPlans();
+            }
+            if (savedPlans.length === 0) {
+              fetchSavedPlans();
+            }
+          });
+        }
       }
     }
   }, [user, authLoading, router]);
@@ -137,22 +120,15 @@ export default function Profile() {
         username: user.username || "",
         firstName: user.firstName || "",
         lastName: user.lastName || "",
-        email: user.email || "",
-        password: "",
-        confirmPassword: ""
+        email: user.email || ""
       });
     }
   }, [user]);
 
   const fetchUserPlans = async () => {
-    if (!user || !user._id) return;
+    if (!user) return;
     
-    const userId = typeof user._id === 'object' && user._id !== null 
-      ? user._id.toString() 
-      : typeof user._id === 'string' 
-        ? user._id 
-        : "";
-        
+    const userId = (user as any).id || user._id?.toString();
     if (!userId) return;
     
     try {
@@ -174,14 +150,9 @@ export default function Profile() {
   };
 
   const fetchSavedPlans = async () => {
-    if (!user || !user._id) return;
+    if (!user) return;
     
-    const userId = typeof user._id === 'object' && user._id !== null 
-      ? user._id.toString() 
-      : typeof user._id === 'string' 
-        ? user._id 
-        : "";
-        
+    const userId = (user as any).id || user._id?.toString();
     if (!userId) return;
     
     try {
@@ -199,14 +170,9 @@ export default function Profile() {
   };
 
   const fetchLikedPlans = async () => {
-    if (!user || !user._id) return;
+    if (!user) return;
     
-    const userId = typeof user._id === 'object' && user._id !== null 
-      ? user._id.toString() 
-      : typeof user._id === 'string' 
-        ? user._id 
-        : "";
-        
+    const userId = (user as any).id || user._id?.toString();
     if (!userId) return;
     
     try {
@@ -224,14 +190,9 @@ export default function Profile() {
   };
 
   const fetchTransactions = async () => {
-    if (!user || !user._id) return;
+    if (!user) return;
     
-    const userId = typeof user._id === 'object' && user._id !== null 
-      ? user._id.toString() 
-      : typeof user._id === 'string' 
-        ? user._id 
-        : "";
-        
+    const userId = (user as any).id || user._id?.toString();
     if (!userId) return;
     
     try {
@@ -316,18 +277,6 @@ export default function Profile() {
         return;
       }
       
-      // Şifre kontrolü
-      if (profileForm.password && profileForm.password !== profileForm.confirmPassword) {
-        toast.error("Şifreler eşleşmiyor");
-        return;
-      }
-      
-      // Şifre uzunluk kontrolü
-      if (profileForm.password && profileForm.password.length < 6) {
-        toast.error("Şifre en az 6 karakter olmalıdır");
-        return;
-      }
-      
       // API'ye gönderilecek veri
       const userId = typeof user._id === 'object' && user._id !== null 
         ? user._id.toString() 
@@ -347,16 +296,6 @@ export default function Profile() {
         lastName: profileForm.lastName
       };
       
-      // Şifre varsa ekle
-      if (profileForm.password) {
-        Object.assign(payload, { password: profileForm.password });
-        
-        // Google hesabı ile giriş yapan kullanıcılar için bilgi mesajı göster
-        if (user.provider === "google") {
-          toast.loading("Google hesabınız ile birlikte şifre de tanımlanıyor. Artık hem Google ile hem de e-posta/şifre ile giriş yapabileceksiniz.");
-        }
-      }
-      
       // API isteği
       const response = await fetch("/api/users/update", {
         method: "POST",
@@ -374,13 +313,6 @@ export default function Profile() {
       
       toast.success("Profil başarıyla güncellendi");
       setIsProfileEditModalOpen(false);
-      
-      // Şifre alanlarını temizle
-      setProfileForm(prev => ({
-        ...prev,
-        password: "",
-        confirmPassword: ""
-      }));
       
       // Kullanıcı bilgilerini güncelle
       await refreshUserData(); // AuthContext'i yenile
@@ -462,18 +394,55 @@ export default function Profile() {
     fileInputRef.current?.click();
   };
 
+  // Profil kurulumu tamamlandığında
+  const handleSetupComplete = () => {
+    setNeedsSetup(false);
+    setActiveTab("profile");
+    refreshUserData();
+  };
+
   if (authLoading) {
     return (
-      <PageContainer>
-        <div className="flex justify-center items-center h-64">
-          <p className="text-gray-500 dark:text-gray-400">Yükleniyor...</p>
+      <PageContainer className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4">Yükleniyor...</p>
         </div>
       </PageContainer>
     );
   }
 
   if (!user) {
-    return null; // Router zaten giriş sayfasına yönlendirecek
+    // Kullanıcı giriş yapmamışsa
+    return (
+      <PageContainer className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md shadow-lg">
+          <CardBody className="text-center py-8">
+            <h2 className="text-xl font-semibold mb-4">Oturum Açmanız Gerekiyor</h2>
+            <p className="mb-6 text-gray-600">Bu sayfayı görüntülemek için lütfen giriş yapın.</p>
+            <Button
+              onClick={() => router.push("/giris")}
+              fullWidth
+            >
+              Giriş Yap
+            </Button>
+          </CardBody>
+        </Card>
+      </PageContainer>
+    );
+  }
+
+  // Kullanıcı kurulum yapması gerekiyorsa
+  if (needsSetup) {
+    return (
+      <PageContainer className="flex items-center justify-center min-h-screen p-4">
+        <div className="w-full max-w-md">
+          <WelcomeSetup 
+            onComplete={handleSetupComplete}
+          />
+        </div>
+      </PageContainer>
+    );
   }
 
   const renderProfileTab = () => {
@@ -489,10 +458,13 @@ export default function Profile() {
                   </div>
                 ) : null}
                 <img 
-                  src={`${user?.profilePicture || "/images/avatars/default.png"}?t=${new Date().getTime()}`} 
+                  src={`${user?.profilePicture || DEFAULT_AVATAR}?t=${new Date().getTime()}`} 
                   alt="Profil resmi" 
                   className="w-full h-full object-cover cursor-pointer"
                   onClick={handleProfilePictureClick}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                  }}
                 />
                 <input 
                   type="file" 
@@ -602,37 +574,6 @@ export default function Profile() {
                   />
                   <p className="text-xs text-gray-500 mt-1">E-posta adresi değiştirilemez.</p>
                 </div>
-                
-                {user?.provider === "google" ? (
-                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                    <h4 className="text-sm font-medium text-blue-800 dark:text-blue-400 mb-1">Google Hesabı Bilgisi</h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      Google hesabınız ile giriş yapıyorsunuz. Aşağıya bir şifre belirlerseniz, hem Google ile hem de e-posta ve şifre ile giriş yapabilirsiniz.
-                    </p>
-                  </div>
-                ) : null}
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {user?.provider === "google" ? "Şifre Belirle (İsteğe Bağlı)" : "Yeni Şifre (Boş bırakırsanız değişmez)"}
-                  </label>
-                  <input 
-                    type="password" 
-                    value={profileForm.password}
-                    onChange={(e) => setProfileForm({...profileForm, password: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Şifre Tekrar</label>
-                  <input 
-                    type="password" 
-                    value={profileForm.confirmPassword}
-                    onChange={(e) => setProfileForm({...profileForm, confirmPassword: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
               </div>
               
               <div className="flex justify-end space-x-3 mt-6">
@@ -645,9 +586,7 @@ export default function Profile() {
                       username: user?.username || "",
                       firstName: user?.firstName || "",
                       lastName: user?.lastName || "",
-                      email: user?.email || "",
-                      password: "",
-                      confirmPassword: ""
+                      email: user?.email || ""
                     });
                   }}
                 >
@@ -673,7 +612,7 @@ export default function Profile() {
               <div className="mb-4 flex justify-center">
                 <div className="w-40 h-40 rounded-full overflow-hidden bg-gray-200">
                   <img 
-                    src={user?.profilePicture || user?.image || DEFAULT_AVATAR} 
+                    src={`${user?.profilePicture || DEFAULT_AVATAR}?t=${new Date().getTime()}`} 
                     alt={user?.username || 'Kullanıcı'} 
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -740,7 +679,7 @@ export default function Profile() {
               price={plan.price || 0}
               maxParticipants={plan.maxParticipants || 0}
               participantCount={plan.participants?.length || 0}
-              isJoined={true}
+              isJoined={plan.participants?.some(p => p.toString() === user._id.toString())}
             />
           ))}
         </div>
@@ -774,7 +713,7 @@ export default function Profile() {
               price={plan.price || 0}
               maxParticipants={plan.maxParticipants || 0}
               participantCount={plan.participants?.length || 0}
-              isJoined={true}
+              isJoined={plan.participants?.some(p => p.toString() === user._id.toString())}
             />
           ))}
         </div>
@@ -808,7 +747,7 @@ export default function Profile() {
               price={plan.price || 0}
               maxParticipants={plan.maxParticipants || 0}
               participantCount={plan.participants?.length || 0}
-              isJoined={true}
+              isJoined={plan.participants?.some(p => p.toString() === user._id.toString())}
             />
           ))}
         </div>

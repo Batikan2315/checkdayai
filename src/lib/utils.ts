@@ -253,4 +253,18 @@ export function safeStringify(obj: any): any {
   
   // Primitif değerleri olduğu gibi döndür
   return obj;
-} 
+}
+
+/**
+ * Benzersiz kullanıcı adı oluşturur
+ * @param email E-posta adresi
+ * @returns Benzersiz kullanıcı adı
+ */
+export const generateUniqueUsername = (email: string): string => {
+  const nameFromEmail = email.split('@')[0].toLowerCase();
+  // Sadece alfanumerik karakterleri ve alt çizgileri koru
+  const cleanName = nameFromEmail.replace(/[^a-z0-9_]/g, '');
+  // Rastgele bir sayı ekle
+  const randomSuffix = Math.floor(Math.random() * 1000);
+  return `${cleanName}${randomSuffix}`;
+}; 

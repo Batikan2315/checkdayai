@@ -30,6 +30,10 @@ import {
   FaImage
 } from "react-icons/fa";
 import { BsCalendar } from "react-icons/bs";
+import { PlanActions } from "@/components/PlanActions";
+
+// Varsayılan profil resmi için güvenli yol
+const DEFAULT_AVATAR = "/images/avatars/default.png";
 
 export default function PlanDetail() {
   const params = useParams();
@@ -44,6 +48,7 @@ export default function PlanDetail() {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [showContent, setShowContent] = useState(false);
   
   // Kullanıcı kimliği
   const userId = session?.user?.id || null;
@@ -106,6 +111,21 @@ export default function PlanDetail() {
           setSaved(data.saves?.includes(userId));
         }
         
+        // Kullanıcı katılım durumunu kontrol et
+        if (session?.user?.id) {
+          const isJoined = data.participants?.some(
+            (p: any) => 
+              p?._id?.toString() === session.user.id || 
+              p?.toString() === session.user.id
+          );
+          setShowContent(isJoined);
+          
+          // Plan oluşturucusu veya katılımcıysa içeriği göster
+          if (isJoined || data.creator?._id === session.user.id) {
+            setShowContent(true);
+          }
+        }
+        
         setLoading(false);
       } catch (error) {
         console.error("Plan yüklenirken hata:", error);
@@ -114,7 +134,7 @@ export default function PlanDetail() {
     };
 
     fetchPlan();
-  }, [id, userId]);
+  }, [id, userId, session?.user?.id, router]);
 
   const handleJoin = async () => {
     if (!userId) {
@@ -476,6 +496,40 @@ export default function PlanDetail() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
+  // Kullanıcı plan detaylarını görüntülemek istiyor
+  useEffect(() => {
+    if (!loading && plan && !isUserJoined && !isLeader) {
+      // Kullanıcı plana katılmamışsa katılması için bir uyarı göster
+      toast.custom((t) => (
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5">
+          <div className="flex-1 p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <FaExclamationTriangle className="h-6 w-6 text-yellow-400" />
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Bu plana henüz katılmadınız
+                </p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Plan detaylarını tam olarak görüntülemek için katılmanız önerilir.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="border-l border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none"
+            >
+              Tamam
+            </button>
+          </div>
+        </div>
+      ));
+    }
+  }, [loading, plan, isUserJoined, isLeader]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -495,6 +549,46 @@ export default function PlanDetail() {
             Tüm Planları Görüntüle
           </Button>
         </div>
+      </div>
+    );
+  }
+  
+  // Kullanıcı plana katılmamışsa ve planın oluşturucusu değilse
+  if (!showContent && session?.user?.id) {
+    return (
+      <div className="container mx-auto px-4 py-10">
+        <Card>
+          <CardBody className="text-center py-10">
+            <h2 className="text-xl font-semibold mb-4">Bu planın detaylarını görmek için katılmanız gerekiyor</h2>
+            <p className="mb-6 text-gray-600 dark:text-gray-400">
+              Bu plan sadece katılımcılar tarafından görüntülenebilir. Detayları görmek için plana katılın.
+            </p>
+            <div className="max-w-xs mx-auto">
+              <PlanActions plan={plan} />
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Kullanıcı giriş yapmamışsa
+  if (!session && !loading) {
+    return (
+      <div className="container mx-auto px-4 py-10">
+        <Card>
+          <CardBody className="text-center py-10">
+            <h2 className="text-xl font-semibold mb-4">Bu planın detaylarını görmek için giriş yapmanız gerekiyor</h2>
+            <p className="mb-6 text-gray-600 dark:text-gray-400">
+              Bu plan sadece giriş yapmış kullanıcılar tarafından görüntülenebilir.
+            </p>
+            <div className="max-w-xs mx-auto">
+              <Button variant="primary" onClick={() => router.push('/giris')}>
+                Giriş Yap
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
       </div>
     );
   }
@@ -585,15 +679,8 @@ export default function PlanDetail() {
             </Button>
           )}
 
-          {!isUserJoined && !isLeader && (
-            <Button
-              variant="primary"
-              onClick={handleJoin}
-              disabled={joining}
-            >
-              {joining ? "İşlem yapılıyor..." : "Katıl"}
-            </Button>
-          )}
+          {/* PlanActions bileşenini kullan */}
+          {plan && <PlanActions plan={plan} />}
 
           <Button variant="outline" onClick={handleShare}>
             <FaInfoCircle className="mr-2" /> Paylaş
@@ -746,18 +833,37 @@ export default function PlanDetail() {
                 <h3 className="font-semibold text-lg">Organizatör</h3>
               </CardHeader>
               <CardBody>
-                {plan.creator ? (
+                {plan?.creator && (
                   <div className="flex items-center">
-                    <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center mr-3">
-                      {plan.creator.name && plan.creator.name[0]}
+                    <div className="w-10 h-10 rounded-full overflow-hidden">
+                      <img 
+                        src={plan.creator.profilePicture || DEFAULT_AVATAR} 
+                        alt={plan.creator.name || 'Organizatör'}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                        }}
+                      />
                     </div>
                     <div>
-                      <div className="font-medium">{plan.creator.name}</div>
-                      <div className="text-sm text-gray-500">{plan.creator.email}</div>
+                      <div className="font-medium">
+                        {plan.creator.firstName && plan.creator.lastName 
+                          ? `${plan.creator.firstName} ${plan.creator.lastName}`
+                          : plan.creator.username || 'Anonim'}
+                      </div>
+                      {plan.creator.username && (
+                        <a 
+                          href={`/${plan.creator.username}`} 
+                          className="text-sm text-blue-500 hover:underline"
+                        >
+                          @{plan.creator.username}
+                        </a>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <div>Organizatör bilgisi alınamadı</div>
+                )}
+                {!plan?.creator && (
+                  <div className="text-gray-500">Organizatör bilgisi bulunamadı</div>
                 )}
               </CardBody>
             </Card>

@@ -1,0 +1,188 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { connect } from '@/lib/dbConnect';
+import Plan from '@/models/Plan';
+import Comment from '@/models/Comment';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/auth';
+import mongoose from 'mongoose';
+
+// Veritabanı bağlantısını kuruyoruz ve hataları yakalıyoruz
+async function connectDB() {
+  try {
+    await connect();
+  } catch (error) {
+    console.error('Veritabanı bağlantı hatası:', error);
+    throw new Error('Veritabanına bağlanılamadı');
+  }
+}
+
+// Plan detaylarını getir
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectDB();
+    
+    const id = params.id;
+    
+    // ID geçerli bir MongoDB ObjectId mi kontrol et
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: 'Geçersiz plan ID formatı' },
+        { status: 400 }
+      );
+    }
+
+    // Planı ve ilgili kullanıcıyı bul
+    const plan = await Plan.findById(id)
+      .populate('creator', 'username firstName lastName image profilePicture')
+      .lean();
+
+    if (!plan) {
+      return NextResponse.json(
+        { error: 'Plan bulunamadı' },
+        { status: 404 }
+      );
+    }
+
+    // Planı döndür
+    return NextResponse.json(plan);
+  } catch (error) {
+    console.error('Plan detayı getirme hatası:', error);
+    return NextResponse.json(
+      { error: 'Plan detayı getirilirken bir hata oluştu' },
+      { status: 500 }
+    );
+  }
+}
+
+// Planı güncelle
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectDB();
+    
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Yetkilendirme hatası' },
+        { status: 401 }
+      );
+    }
+    
+    const id = params.id;
+    const body = await request.json();
+    
+    // ID geçerli bir MongoDB ObjectId mi kontrol et
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: 'Geçersiz plan ID formatı' },
+        { status: 400 }
+      );
+    }
+
+    // Planı bul
+    const plan = await Plan.findById(id);
+    
+    if (!plan) {
+      return NextResponse.json(
+        { error: 'Plan bulunamadı' },
+        { status: 404 }
+      );
+    }
+    
+    // Kullanıcı bu planın sahibi mi veya admin mi kontrol et
+    const userId = session.user.id;
+    const isAdmin = session.user.isAdmin as boolean;
+    const planCreator = plan.creator && plan.creator.toString();
+    
+    // Kullanıcı yetki kontrolü
+    if (planCreator !== userId && !isAdmin) {
+      return NextResponse.json(
+        { error: 'Bu planı düzenleme yetkiniz yok' },
+        { status: 403 }
+      );
+    }
+    
+    // Planı güncelle
+    const updatedPlan = await Plan.findByIdAndUpdate(id, body, { new: true })
+      .populate('creator', 'username firstName lastName image profilePicture');
+    
+    return NextResponse.json(updatedPlan);
+  } catch (error) {
+    console.error('Plan güncelleme hatası:', error);
+    return NextResponse.json(
+      { error: 'Plan güncellenirken bir hata oluştu' },
+      { status: 500 }
+    );
+  }
+}
+
+// Planı sil
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectDB();
+    
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Yetkilendirme hatası' },
+        { status: 401 }
+      );
+    }
+    
+    const id = params.id;
+    
+    // ID geçerli bir MongoDB ObjectId mi kontrol et
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: 'Geçersiz plan ID formatı' },
+        { status: 400 }
+      );
+    }
+
+    // Planı bul
+    const plan = await Plan.findById(id);
+    
+    if (!plan) {
+      return NextResponse.json(
+        { error: 'Plan bulunamadı' },
+        { status: 404 }
+      );
+    }
+    
+    // Kullanıcı bu planın sahibi mi veya admin mi kontrol et
+    const userId = session.user.id;
+    const isAdmin = session.user.isAdmin as boolean;
+    const planCreator = plan.creator && plan.creator.toString();
+    
+    if (planCreator !== userId && !isAdmin) {
+      return NextResponse.json(
+        { error: 'Bu planı silme yetkiniz yok' },
+        { status: 403 }
+      );
+    }
+    
+    // Planı sil
+    await Plan.findByIdAndDelete(id);
+    
+    // Plana ait tüm yorumları sil
+    await Comment.deleteMany({ plan: id });
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Plan silme hatası:', error);
+    return NextResponse.json(
+      { error: 'Plan silinirken bir hata oluştu' },
+      { status: 500 }
+    );
+  }
+} 

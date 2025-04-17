@@ -237,8 +237,8 @@ export default function EditPlan() {
     
     // Kullanıcı kontrolü
     if (!user) {
-      toast.error("Lütfen önce giriş yapın");
-      router.push("/giris");
+      toast.error("Düzenleme yapabilmek için giriş yapmanız gerekiyor");
+      router.push("/login");
       return;
     }
     
@@ -254,7 +254,7 @@ export default function EditPlan() {
     }
     
     // Form doğrulama
-    const validationErrors = [];
+    const validationErrors: string[] = [];
     
     if (!formData.title) validationErrors.push("Başlık zorunludur");
     if (!formData.description) validationErrors.push("Açıklama zorunludur");

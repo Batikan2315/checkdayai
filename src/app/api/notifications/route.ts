@@ -3,7 +3,7 @@ import { connectDB } from "@/lib/db";
 import Notification from "@/models/Notification";
 import mongoose from "mongoose";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/auth";
 
 // Basit bir önbellek implementasyonu
 const CACHE_TTL = 5 * 60 * 1000; // 5 dakika - milisaniye cinsinden (1 dakikadan 5 dakikaya çıkarıldı)

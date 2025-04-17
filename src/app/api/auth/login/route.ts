@@ -39,30 +39,15 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Google OAuth ile kaydedilmiş ve şifresi olmayan kullanıcı kontrolü
+    // Kullanıcı, şifresi olmayan Google hesabıysa
     if (user.oauth_id && !user.password) {
       return NextResponse.json(
         { 
-          message: "Bu hesap Google ile kaydedilmiş. Lütfen Google ile giriş yapın.", 
-          code: "GOOGLE_USER_PASSWORD_LOGIN" 
+          message: "Bu hesap Google ile kaydedilmiş ve henüz şifre belirlenmemiş. Lütfen Google ile giriş yapın veya 'Şifremi Unuttum' seçeneğini kullanarak bir şifre belirleyin.", 
+          code: "GOOGLE_USER_NO_PASSWORD" 
         }, 
         { status: 400 }
       );
-    }
-    
-    // Kullanıcı birden fazla giriş yöntemi kullanabilir 
-    // (hem normal hem Google) kontrol et
-    if (user.provider && user.provider.includes('google') && !user.provider.includes('credentials')) {
-      // Eğer provider sadece google ise ve credentials değilse
-      if (!user.password) {
-        return NextResponse.json(
-          {
-            message: "Bu e-posta Google hesabıyla ilişkilendirilmiş. Lütfen Google ile giriş yapın.",
-            code: "GOOGLE_USER_PASSWORD_LOGIN"
-          },
-          { status: 400 }
-        );
-      }
     }
     
     // E-posta doğrulanmış mı kontrol et

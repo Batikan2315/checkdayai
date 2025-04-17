@@ -6,16 +6,20 @@ import Image from "next/image";
 import PageContainer from "@/components/layout/PageContainer";
 import { Card, CardBody } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import { FaCalendarAlt, FaUserFriends, FaRobot, FaClock, FaMapMarkerAlt, FaSearch, FaArrowRight, FaApple, FaGooglePlay } from "react-icons/fa";
+import { FaCalendarAlt, FaUserFriends, FaRobot, FaClock, FaMapMarkerAlt, FaSearch, FaArrowRight, FaApple, FaGooglePlay, FaGoogle } from "react-icons/fa";
 import PlanCard from "@/components/ui/PlanCard";
 import { toast } from "react-hot-toast";
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { BsArrowRight } from "react-icons/bs";
+import { signIn } from "next-auth/react";
 
 // API İstekleri için önbellek anahtarları ve geçerlilik süreleri
 const PLANS_CACHE_KEY = 'homepage_plans_cache';
 const PLANS_CACHE_TTL = 30 * 60 * 1000; // 30 dakika (ms)
+
+// Popup bekletme süresi değişkeni
+const POPUP_TIMEOUT = 30 * 60 * 1000; // 30 dakika (ms)
 
 export default function Home() {
   const [countdown, setCountdown] = useState<{
@@ -34,6 +38,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const router = useRouter();
+  const [showLoginPopup, setShowLoginPopup] = useState(false);
 
   // Önbellekten veri alma işlevi
   const getFromCache = useCallback((key: string) => {
@@ -235,8 +240,91 @@ export default function Home() {
     initHomepage();
   }, [fetchRandomPlans, getFromCache]);
 
+  // Kullanıcı giriş yapmamışsa pop-up'ı göster, ama localStorage'da "postponed" varsa gösterme
+  useEffect(() => {
+    if (!user) {
+      // Erteleme durumunu kontrol et
+      const loginPopupPostponed = localStorage.getItem('loginPopupPostponed');
+      if (loginPopupPostponed) {
+        const postponedTime = parseInt(loginPopupPostponed);
+        // Erteleme süresi dolmuş mu kontrol et
+        if (Date.now() < postponedTime) {
+          return; // Erteleme süresi dolmamış, popup'ı gösterme
+        } else {
+          // Erteleme süresi dolmuş, localStorage'dan kaldır
+          localStorage.removeItem('loginPopupPostponed');
+        }
+      }
+      
+      // Pop-up'ı 2 saniye sonra göster (kullanıcı deneyimi için biraz gecikme)
+      const timer = setTimeout(() => {
+        setShowLoginPopup(true);
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+  
+  // Google ile giriş yap
+  const handleGoogleLogin = async () => {
+    try {
+      await signIn("google", {
+        callbackUrl: window.location.pathname || "/"
+      });
+    } catch (error) {
+      console.error("Google girişi hatası:", error);
+      toast.error("Google ile giriş yapılırken bir hata oluştu");
+    }
+  };
+
+  // Popup'ı sonraya ertele
+  const postponeLoginPopup = () => {
+    // Popup'ı kapat
+    setShowLoginPopup(false);
+    // 30 dakika sonrasını kaydet (zamana 30 dakika ekle)
+    localStorage.setItem('loginPopupPostponed', (Date.now() + POPUP_TIMEOUT).toString());
+  };
+
   return (
     <PageContainer>
+      {/* Google Giriş Pop-up'ı değiştir - tam ekran yerine küçük bildirim stili */}
+      {showLoginPopup && !user && (
+        <div className="fixed top-20 right-4 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 z-50 border border-gray-200 dark:border-gray-700 animate-fadeIn">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="text-lg font-bold">CheckDay'e Hoş Geldiniz</h3>
+            <button 
+              onClick={() => setShowLoginPopup(false)} 
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              &times;
+            </button>
+          </div>
+          
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            Giriş yaparak tüm özelliklere erişin
+          </p>
+          
+          <Button
+            type="button"
+            variant="primary"
+            fullWidth
+            onClick={handleGoogleLogin}
+            className="flex items-center justify-center text-sm mb-2"
+            size="sm"
+          >
+            <FaGoogle className="mr-2" />
+            Google ile Giriş Yap
+          </Button>
+          
+          <button 
+            className="text-xs text-gray-500 dark:text-gray-400 py-1 hover:underline w-full text-center"
+            onClick={postponeLoginPopup}
+          >
+            Daha sonra hatırlat
+          </button>
+        </div>
+      )}
+
       <div className="space-y-12">
         {/* Geri Sayım veya Küçük Hero Bölümü */}
         {countdown?.active ? (

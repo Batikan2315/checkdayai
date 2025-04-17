@@ -1,131 +1,105 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import Plan from '@/models/Plan';
+import Comment from '@/models/Comment';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/auth';
 import mongoose from 'mongoose';
-import { safeStringify } from '@/lib/utils';
+import User from '@/models/User';
 
-// GET: Belirli bir planı getir
-export async function GET(req: NextRequest) {
+// Plan ID'sine göre plan detaylarını getir
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     await connectDB();
-    
-    // URL'den ID'yi al
-    const url = new URL(req.url);
-    const segments = url.pathname.split('/');
-    const id = segments[segments.length - 1]; // /api/plans/[id] formatında
-    
-    if (!id) {
-      return NextResponse.json({ error: 'Plan ID zorunludur' }, { status: 400 });
-    }
-    
+    const id = params.id;
+
     const plan = await Plan.findById(id)
-      .populate({
-        path: 'creator',
-        select: 'username firstName lastName profilePicture',
-        model: 'User'
-      })
-      .populate({
-        path: 'leaders',
-        select: 'username firstName lastName profilePicture',
-        model: 'User'
-      })
-      .populate('participants', 'username firstName lastName profilePicture')
+      .populate('creator', 'username firstName lastName profilePicture googleProfilePicture email oauth_id')
+      .populate('participants', 'username firstName lastName profilePicture googleProfilePicture email')
+      .populate('leaders', 'username firstName lastName profilePicture googleProfilePicture email')
       .lean();
-    
+
     if (!plan) {
       return NextResponse.json({ error: 'Plan bulunamadı' }, { status: 404 });
     }
-    
-    // Tarih ve ObjectId dönüşümleri için
-    const serializedPlan = safeStringify(plan);
-    
-    return NextResponse.json(serializedPlan);
+
+    return NextResponse.json(plan);
   } catch (error: any) {
     console.error('Plan detayı getirme hatası:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// PATCH: Plan bilgilerini güncelle
-export async function PATCH(req: NextRequest) {
+// Plan güncelleme
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     await connectDB();
+    const id = params.id;
+    const body = await request.json();
 
-    // URL'den ID'yi al
-    const url = new URL(req.url);
-    const segments = url.pathname.split('/');
-    const id = segments[segments.length - 1]; // /api/plans/[id] formatında
-    
-    const body = await req.json();
-    
-    // Geçerli bir MongoDB ObjectId mi kontrol et
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Geçersiz plan ID' }, { status: 400 });
-    }
+    const plan = await Plan.findByIdAndUpdate(
+      id,
+      { $set: body },
+      { new: true }
+    )
+      .populate('creator', 'username firstName lastName profilePicture googleProfilePicture email oauth_id')
+      .populate('participants', 'username firstName lastName profilePicture googleProfilePicture email')
+      .populate('leaders', 'username firstName lastName profilePicture googleProfilePicture email')
+      .lean();
 
-    // Planı bul
-    const plan = await Plan.findById(id);
-    
     if (!plan) {
       return NextResponse.json({ error: 'Plan bulunamadı' }, { status: 404 });
     }
-    
-    // Kullanıcı yetkisi kontrolü (gerçek uygulamada kullanılacak)
-    // Şimdilik yetki kontrolü yapmıyoruz, middleware ile yapılacak
-    
-    // Planı güncelle
-    const updatedPlan = await Plan.findByIdAndUpdate(
-      id,
-      { $set: body },
-      { new: true, runValidators: true }
-    )
-      .populate('creator', 'username firstName lastName profilePicture')
-      .lean();
 
-    return NextResponse.json(updatedPlan);
+    return NextResponse.json(plan);
   } catch (error: any) {
     console.error('Plan güncelleme hatası:', error);
-    
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
-      return NextResponse.json({ error: validationErrors }, { status: 400 });
-    }
-    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// DELETE: Planı sil
-export async function DELETE(req: NextRequest) {
+// Plan silme
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     await connectDB();
+    const id = params.id;
 
-    // URL'den ID'yi al
-    const url = new URL(req.url);
-    const segments = url.pathname.split('/');
-    const id = segments[segments.length - 1]; // /api/plans/[id] formatında
-    
-    // Geçerli bir MongoDB ObjectId mi kontrol et
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Geçersiz plan ID' }, { status: 400 });
-    }
+    // Planı sil
+    const plan = await Plan.findByIdAndDelete(id);
 
-    // Planı bul
-    const plan = await Plan.findById(id);
-    
     if (!plan) {
       return NextResponse.json({ error: 'Plan bulunamadı' }, { status: 404 });
     }
-    
-    // Kullanıcı yetkisi kontrolü (gerçek uygulamada kullanılacak)
-    // Şimdilik yetki kontrolü yapmıyoruz, middleware ile yapılacak
 
-    // Planı sil (ya da deaktif et)
-    // Gerçek silme
-    await Plan.findByIdAndDelete(id);
-    
-    // Veya yalnızca deaktif etme
-    // await Plan.findByIdAndUpdate(id, { isActive: false });
+    // Kullanıcıların katıldığı planlardan da kaldır
+    await User.updateMany(
+      { participatingPlans: id },
+      { $pull: { participatingPlans: id } }
+    );
+
+    // Kullanıcıların kaydedilmiş planlarından da kaldır
+    await User.updateMany(
+      { savedPlans: id },
+      { $pull: { savedPlans: id } }
+    );
+
+    // Kullanıcıların beğendiği planlardan da kaldır
+    await User.updateMany(
+      { likedPlans: id },
+      { $pull: { likedPlans: id } }
+    );
+
+    // Plana ait tüm yorumları sil
+    await Comment.deleteMany({ plan: id });
 
     return NextResponse.json({ message: 'Plan başarıyla silindi' });
   } catch (error: any) {

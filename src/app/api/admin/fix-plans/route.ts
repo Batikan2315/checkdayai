@@ -3,7 +3,7 @@ import { connectDB } from "@/lib/db";
 import Plan from "@/models/Plan";
 import User from "@/models/User";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/auth";
 
 /**
  * Bu API endpoint'i aşağıdaki planları tespit edip düzeltir:

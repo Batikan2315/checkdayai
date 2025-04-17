@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 // Sistem tarafından rezerve edilmiş kullanıcı adları
 const RESERVED_USERNAMES = [
@@ -11,7 +12,10 @@ const RESERVED_USERNAMES = [
   'static', 'assets', 'public', 'images', 'js', 'css', 'reset-password',
   
   // Türkçe karşılıkları (geçici olarak hem İngilizce hem Türkçe korunacak)
-  'planlar', 'takvim', 'profil', 'giris', 'kayit', 'sifremi-sifirla'
+  'planlar', 'takvim', 'profil', 'giris', 'kayit', 'sifremi-sifirla',
+  'root', 'moderator', 'info', 'team', 'official', 'founder', 'ceo',
+  'administrator', 'mod', 'system', 'username', 'guest', 'anonymous',
+  'undefined', 'null'
 ];
 
 export interface IUser extends Document {
@@ -23,7 +27,7 @@ export interface IUser extends Document {
   isVerified: boolean;
   profilePicture?: string;
   balance: number;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'moderator';
   notificationPreferences: {
     system: boolean;
     invitation: boolean;
@@ -38,6 +42,19 @@ export interface IUser extends Document {
   updatedAt: Date;
   oauth_id?: string; // OAuth sağlayıcısından gelen ID
   comparePassword: (password: string) => Promise<boolean>;
+  googleProfilePicture?: string;
+  googleId?: string;
+  plan: mongoose.Schema.Types.ObjectId;
+  notificationSettings: {
+    email: boolean;
+    push: boolean;
+    sms: boolean;
+  };
+  fcmTokens: string[];
+  deviceIds: string[];
+  resetPasswordToken?: string;
+  resetPasswordExpire?: Date;
+  getResetPasswordToken(): string;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -87,7 +104,11 @@ const UserSchema = new Schema<IUser>(
     },
     profilePicture: {
       type: String,
-      default: '/images/avatars/default.png',
+      default: '',
+    },
+    googleProfilePicture: {
+      type: String,
+      default: '',
     },
     balance: {
       type: Number,
@@ -95,7 +116,7 @@ const UserSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ['user', 'admin'],
+      enum: ['user', 'admin', 'moderator'],
       default: 'user',
     },
     notificationPreferences: {
@@ -112,6 +133,35 @@ const UserSchema = new Schema<IUser>(
       type: String,
       index: true,
     },
+    googleId: {
+      type: String,
+    },
+    plan: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Plan',
+    },
+    notificationSettings: {
+      email: {
+        type: Boolean,
+        default: true,
+      },
+      push: {
+        type: Boolean,
+        default: true,
+      },
+      sms: {
+        type: Boolean,
+        default: false,
+      },
+    },
+    fcmTokens: [{
+      type: String,
+    }],
+    deviceIds: [{
+      type: String,
+    }],
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
   },
   {
     timestamps: true,
@@ -131,6 +181,15 @@ UserSchema.pre('save', async function (next) {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     console.log('Şifre hash\'lendi:', this.password.substring(0, 20) + '...');
+
+    const user = this as any;
+    
+    // Eğer kullanıcının Google profil fotoğrafı varsa ve kendi yüklediği bir fotoğraf yoksa
+    if (user.googleProfilePicture && !user.profilePicture) {
+      // Google fotoğrafını kullanıcı profil fotoğrafı olarak ayarla
+      user.profilePicture = user.googleProfilePicture;
+    }
+
     next();
   } catch (error: any) {
     console.error('Şifre hash\'leme hatası:', error);
@@ -150,6 +209,23 @@ UserSchema.methods.comparePassword = async function (password: string): Promise<
     console.error("Şifre karşılaştırma hatası:", error);
     throw error;
   }
+};
+
+// Şifre sıfırlama tokeni oluştur
+UserSchema.methods.getResetPasswordToken = function () {
+  // Token oluştur
+  const resetToken = crypto.randomBytes(20).toString('hex');
+
+  // Hash token ve resetPasswordToken'a ayarla
+  this.resetPasswordToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  // Sona erme süresini ayarla - 10 dakika
+  this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+
+  return resetToken;
 };
 
 // Mongoose modelinin tekrar derlenme hatasını önlemek için

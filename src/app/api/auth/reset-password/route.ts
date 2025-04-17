@@ -101,17 +101,6 @@ export async function POST(req: NextRequest) {
     // Kullanıcıyı bul
     const user = await User.findOne({ email });
     
-    // Google hesabıyla giriş yapmış kullanıcı kontrolü
-    if (user && user.oauth_id && !user.password) {
-      return NextResponse.json(
-        { 
-          message: "Bu hesap Google ile kaydedilmiş. Lütfen Google ile giriş yapın.",
-          code: "GOOGLE_USER"
-        },
-        { status: 400 }
-      );
-    }
-    
     // Kullanıcı yoksa bile başarılı yanıt dön (güvenlik için)
     if (!user) {
       // Güvenlik nedeniyle başarılı mesajı dön ama e-posta gönderme

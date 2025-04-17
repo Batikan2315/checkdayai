@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/auth";
 import fs from "fs";
 import path from "path";
 
@@ -58,7 +58,7 @@ const writeCountdownData = (data: CountdownData): boolean => {
 };
 
 // GET isteği - geri sayım verilerini getir
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const countdownData = readCountdownData();
     

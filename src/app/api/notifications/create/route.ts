@@ -4,7 +4,7 @@ import { connectDB } from "@/lib/db";
 import Notification from "@/models/Notification";
 import User from "@/models/User";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/auth";
 import { sendNotificationToUser } from "@/lib/socket";
 import { Socket } from "net";
 import { Server as SocketIOServer } from "socket.io";

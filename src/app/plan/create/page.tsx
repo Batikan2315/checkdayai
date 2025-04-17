@@ -176,7 +176,7 @@ export default function CreatePlan() {
     // Kullanıcı kontrolü
     if (!user) {
       toast.error("Lütfen önce giriş yapın");
-      router.push("/giris");
+      router.push("/login");
       return;
     }
     
@@ -192,7 +192,7 @@ export default function CreatePlan() {
     }
     
     // Form doğrulama
-    const validationErrors = [];
+    const validationErrors: string[] = [];
     
     if (!formData.title) validationErrors.push("Başlık zorunludur");
     if (!formData.description) validationErrors.push("Açıklama zorunludur");
@@ -366,8 +366,27 @@ export default function CreatePlan() {
         throw new Error(errorData.error || 'Plan oluşturulurken bir hata oluştu');
       }
       
+      const createdPlan = await response.json();
+      
+      // Planı otomatik olarak kullanıcının takvimine ekle
+      if (createdPlan?._id) {
+        try {
+          await fetch(`/api/calendar/add/${createdPlan._id}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ userId }),
+          });
+          console.log("Plan takvime otomatik olarak eklendi");
+        } catch (calendarError) {
+          console.error("Takvime ekleme hatası:", calendarError);
+          // Takvime ekleme başarısız olsa bile plana devam et
+        }
+      }
+      
       toast.success("Plan başarıyla oluşturuldu!");
-      router.push("/planlar");
+      router.push("/plans");
     } catch (error: any) {
       console.error("Plan oluşturma hatası:", error);
       toast.error(error.message || "Plan oluşturulurken bir hata oluştu");

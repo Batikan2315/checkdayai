@@ -1,0 +1,5 @@
+/_next/static/*  /_next/static/:splat  200
+/_next/image*    /_next/image:splat   200
+/_next/data/*    /_next/data/:splat   200
+/socket.io/*     /:splat              200
+/api/*           /.netlify/functions/api/:splat  200 

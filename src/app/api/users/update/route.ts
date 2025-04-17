@@ -73,8 +73,11 @@ export async function POST(req: NextRequest) {
 
     // Şifre varsa hash'le ve ekle
     if (password) {
+      // Manuel olarak hash işlemini yapıyoruz (save middleware çalışmayacağı için)
+      console.log('Şifre değişti, yeni hash oluşturuluyor...');
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
+      console.log('Şifre hash\'lendi:', hashedPassword.substring(0, 20) + '...');
       updateData.password = hashedPassword;
       
       // OAuth kullanıcıları için önemli: şifreyi eklerken, bu kullanıcıların

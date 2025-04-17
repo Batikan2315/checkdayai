@@ -1,106 +1,126 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
 import { FaExclamationTriangle, FaArrowLeft } from "react-icons/fa";
 import Link from "next/link";
+import Input from "@/components/ui/Input";
+import { format } from "date-fns";
+import { tr } from 'date-fns/locale';
+
+// Interface tanımları
+interface IMessage {
+  _id: string;
+  content: string;
+  createdAt: string;
+  user?: {
+    _id: string;
+    name?: string;
+    image?: string;
+  };
+}
+
+interface IPlan {
+  _id: string;
+  title: string;
+  creator?: {
+    _id: string;
+    name?: string;
+    image?: string;
+  };
+  participants?: Array<{_id: string}>;
+  leaders?: Array<{_id: string}>;
+}
 
 export default function PlanRoom() {
   const params = useParams();
   const id = params?.id as string;
   const router = useRouter();
-  const { data: session } = useSession();
-  const [plan, setPlan] = useState<any>(null);
+  const { data: session, status } = useSession();
+  const [isValid, setIsValid] = useState(true);
+  const [plan, setPlan] = useState<IPlan | null>(null);
+  const [messages, setMessages] = useState<IMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(true);
-  const [sendingMessage, setSendingMessage] = useState(false);
   const [joining, setJoining] = useState(false);
 
-  // Kullanıcı kimliği
-  const userId = session?.user?.id || null;
-
   useEffect(() => {
-    // Plan bilgilerini getir ve erişim kontrolü yap
-    const fetchPlanAndCheckAccess = async () => {
-      if (!userId) {
-        setLoadingAccess(false);
-        setHasAccess(false);
-        return;
-      }
-
+    const checkAccess = async () => {
       try {
         setLoading(true);
-        // Plan bilgilerini getir
-        const response = await fetch(`/api/plans/${id}`);
+        setError(null);
         
-        if (!response.ok) {
-          throw new Error('Plan detayları getirilemedi');
+        // Oturum kontrolü güncellendi
+        if (status === 'loading') {
+          // Oturum durumu yükleniyor, bekleyin
+          return;
         }
         
-        const data = await response.json();
+        if (status === 'unauthenticated') {
+          setIsValid(false);
+          setError('Bu sayfaya erişmek için oturum açmanız gerekiyor.');
+          setLoading(false);
+          return;
+        }
+        
+        // Plan bilgilerini al
+        const res = await fetch(`/api/plans/${id}`);
+        
+        if (!res.ok) {
+          if (res.status === 404) {
+            setIsValid(false);
+            setError('Plan bulunamadı.');
+          } else {
+            throw new Error('Plan bilgileri alınırken bir hata oluştu.');
+          }
+          setLoading(false);
+          return;
+        }
+        
+        const data = await res.json();
         setPlan(data);
         
-        // Erişim kontrolü
-        const isCreator = data.creator?._id === userId || data.creator === userId;
-        const isLeader = data.leaders?.some((leader: any) => 
-          typeof leader === 'object' ? leader._id === userId : leader === userId
-        );
-        const isParticipant = data.participants?.some((participant: any) => 
-          typeof participant === 'object' ? participant._id === userId : participant === userId
-        );
+        // Kullanıcının plana erişim hakkı var mı kontrol et
+        const userId = session?.user?.id;
+        const isCreator = data.creator?._id === userId;
+        const isParticipant = data.participants?.some((p: any) => p._id === userId);
+        const isLeader = data.leaders?.some((l: any) => l._id === userId);
         
-        // Erişim izni var mı?
-        const userHasAccess = isCreator || isLeader || isParticipant;
-        setHasAccess(userHasAccess);
-        setLoadingAccess(false);
-        
-        // Erişim izni varsa mesajları yükle
-        if (userHasAccess) {
-          fetchMessages();
+        if (!isCreator && !isParticipant && !isLeader) {
+          setIsValid(false);
+          setError('Bu plan odasına erişim izniniz yok. Katılımcı veya lider olmanız gerekiyor.');
+        } else {
+          // Mesajları getir
+          const messagesRes = await fetch(`/api/plans/${id}/messages`);
+          if (messagesRes.ok) {
+            const messagesData = await messagesRes.json();
+            setMessages(messagesData);
+          }
         }
-        
+      } catch (err) {
+        console.error('Error checking access:', err);
+        setError('Bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+        setIsValid(false);
+      } finally {
         setLoading(false);
-      } catch (error) {
-        console.error("Plan yüklenirken hata:", error);
-        toast.error("Plan bilgileri yüklenemedi");
-        setLoading(false);
-        setLoadingAccess(false);
       }
     };
-
-    fetchPlanAndCheckAccess();
-  }, [id, userId]);
-
-  const fetchMessages = async () => {
-    try {
-      setLoadingMessages(true);
-      const response = await fetch(`/api/plans/${id}/messages`);
-      
-      if (!response.ok) {
-        // İlk kez erişiliyorsa mesaj henüz olmayabilir, bu yüzden hata gösterme
-        setMessages([]);
-        setLoadingMessages(false);
-        return;
-      }
-      
-      const data = await response.json();
-      setMessages(data.messages || []);
-      setLoadingMessages(false);
-    } catch (error) {
-      console.error("Mesajlar yüklenirken hata:", error);
-      setLoadingMessages(false);
+    
+    if (id) {
+      checkAccess();
     }
-  };
+  }, [id, status, session]);
 
   const handleSendMessage = async () => {
-    if (!userId) {
+    if (!session?.user?.id) {
       toast.error('Mesaj göndermek için giriş yapmalısınız');
       return;
     }
@@ -120,7 +140,7 @@ export default function PlanRoom() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: userId,
+          userId: session?.user?.id,
           content: newMessage
         }),
       });
@@ -143,7 +163,7 @@ export default function PlanRoom() {
   };
 
   const handleJoin = async () => {
-    if (!userId) {
+    if (!session?.user?.id) {
       toast.error('Katılmak için giriş yapmalısınız');
       return;
     }
@@ -158,7 +178,7 @@ export default function PlanRoom() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: userId
+          userId: session?.user?.id
         }),
       });
       
@@ -185,6 +205,27 @@ export default function PlanRoom() {
     }
   };
 
+  const fetchMessages = async () => {
+    try {
+      setLoadingMessages(true);
+      const response = await fetch(`/api/plans/${id}/messages`);
+      
+      if (!response.ok) {
+        // İlk kez erişiliyorsa mesaj henüz olmayabilir, bu yüzden hata gösterme
+        setMessages([]);
+        setLoadingMessages(false);
+        return;
+      }
+      
+      const data = await response.json();
+      setMessages(data.messages || []);
+      setLoadingMessages(false);
+    } catch (error) {
+      console.error("Mesajlar yüklenirken hata:", error);
+      setLoadingMessages(false);
+    }
+  };
+
   if (loading || loadingAccess) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -194,7 +235,7 @@ export default function PlanRoom() {
   }
 
   // Erişim kontrolü
-  if (!userId) {
+  if (!session?.user?.id) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="mb-4">
@@ -218,7 +259,7 @@ export default function PlanRoom() {
     );
   }
 
-  if (!hasAccess) {
+  if (!isValid) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="mb-4">
@@ -233,18 +274,8 @@ export default function PlanRoom() {
             </div>
             <div className="ml-3">
               <p className="text-sm text-yellow-700">
-                Plan odasına erişmek için plana katılmalısınız.
+                {error}
               </p>
-              <div className="mt-2">
-                <Button 
-                  variant="primary" 
-                  onClick={handleJoin} 
-                  disabled={joining}
-                  size="sm"
-                >
-                  {joining ? 'Katılıyor...' : 'Plana Katıl'}
-                </Button>
-              </div>
             </div>
           </div>
         </div>
@@ -286,11 +317,11 @@ export default function PlanRoom() {
             {messages.map((message: any) => (
               <div 
                 key={message._id} 
-                className={`flex ${message.user?._id === userId ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${message.user?._id === session?.user?.id ? 'justify-end' : 'justify-start'}`}
               >
                 <div 
                   className={`max-w-[70%] p-3 rounded-lg ${
-                    message.user?._id === userId 
+                    message.user?._id === session?.user?.id 
                       ? 'bg-blue-100 text-blue-900' 
                       : 'bg-gray-100 text-gray-900'
                   }`}

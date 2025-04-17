@@ -1,52 +1,37 @@
 "use client";
 
-import React from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import LoginForm from "./LoginForm";
-import { Card, CardHeader, CardBody, CardFooter } from "@/components/ui/Card";
-import { FaLock } from "react-icons/fa";
+import React from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardBody, CardHeader } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import { FaGoogle } from 'react-icons/fa';
 
 export default function Login() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  
-  // Oturum açıksa ana sayfaya yönlendir
-  React.useEffect(() => {
-    if (status === "authenticated") {
-      router.push("/");
-    }
-  }, [status, router]);
-  
-  if (status === "loading") {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-  
+  const { loginWithGoogle } = useAuth();
+
+  const handleGoogleLogin = async () => {
+    await loginWithGoogle();
+  };
+
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100 p-4">
+    <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center py-6">
-          <div className="mx-auto bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mb-4">
-            <FaLock className="text-blue-600 text-2xl" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800">Giriş Yap</h1>
-          <p className="text-gray-600 mt-2">CheckDay hesabınıza giriş yapın</p>
-        </CardHeader>
-        
-        <CardBody>
-          <LoginForm />
-        </CardBody>
-        
-        <CardFooter className="text-center border-t border-gray-200 py-4">
-          <p className="text-gray-600">
-            © {new Date().getFullYear()} CheckDay. Tüm hakları saklıdır.
+        <CardHeader className="text-center">
+          <h1 className="text-2xl font-bold">Welcome to CheckDay</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            The easiest way to plan your day
           </p>
-        </CardFooter>
+        </CardHeader>
+        <CardBody className="space-y-6">
+          <Button 
+            onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center"
+            variant="outline"
+          >
+            <FaGoogle className="mr-2" />
+            Sign in with Google
+          </Button>
+        </CardBody>
       </Card>
     </div>
   );

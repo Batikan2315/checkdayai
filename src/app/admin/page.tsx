@@ -9,6 +9,14 @@ import { useAuth } from "@/hooks/useAuth";
 import PageContainer from "@/components/layout/PageContainer";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
+import { 
+  Typography, 
+  Container, 
+  Paper, 
+  Box, 
+  CircularProgress,
+} from "@mui/material";
+import { useSession } from "next-auth/react";
 
 // Tip tanımlamaları
 interface User {
@@ -57,10 +65,11 @@ interface LoadingState {
 }
 
 export default function AdminPanel() {
-  // API'den alınacak veriler için state'ler
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const { user, isAdmin, loading } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const { data: session } = useSession();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const [loadingState, setLoadingState] = useState<LoadingState>({
     stats: false,
     users: false,
@@ -83,93 +92,6 @@ export default function AdminPanel() {
     date: "",
     active: false
   });
-  
-  // Admin yetkisi kontrolü
-  useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        console.log("Admin paneline erişim reddedildi: Kullanıcı oturumu yok");
-        router.push('/giris');
-        toast.error("Bu sayfaya erişmek için giriş yapmalısınız");
-        return;
-      }
-      
-      if (!isAdmin) {
-        console.log("Admin paneline erişim reddedildi:", { 
-          userId: user._id,
-          userEmail: user.email,
-          userRole: user.role 
-        });
-        router.push('/');
-        toast.error("Bu sayfaya erişmek için admin yetkisine sahip olmalısınız");
-        return;
-      }
-
-      console.log("Admin oturumu doğrulandı:", { 
-        userId: user._id,
-        userEmail: user.email,
-        userRole: user.role 
-      });
-      
-      // Admin girişi başarılı ise geri sayım verilerini getir
-      fetchCountdownData();
-    }
-  }, [user, isAdmin, loading, router]);
-  
-  // Admin yetkisi kontrolü
-  useEffect(() => {
-    console.log("Admin kontrol durumu:", { loading, user: !!user, isAdmin });
-    
-    const checkAdminStatus = async () => {
-      try {
-        // Manuel olarak admin durumunu API'den kontrol et
-        const response = await fetch('/api/auth/check-admin');
-        const data = await response.json();
-        
-        console.log("Admin API yanıtı:", data);
-        
-        if (!loading) {
-          if (!user) {
-            console.log("Admin paneline erişim reddedildi: Kullanıcı oturumu yok");
-            router.push('/giris');
-            toast.error("Bu sayfaya erişmek için giriş yapmalısınız");
-            return;
-          }
-          
-          if (!isAdmin && !data.isAdmin) {
-            console.log("Admin paneline erişim reddedildi:", { 
-              userId: user._id,
-              userEmail: user.email,
-              userRole: user.role,
-              tokenRole: data.tokenRole,
-              dbRole: data.dbRole 
-            });
-            
-            // Kullanıcıyı ana sayfaya yönlendir
-            router.push('/');
-            toast.error("Bu sayfaya erişmek için admin yetkisine sahip olmalısınız");
-            return;
-          }
-
-          console.log("Admin oturumu doğrulandı:", { 
-            userId: user._id,
-            userEmail: user.email,
-            userRole: user.role,
-            tokenRole: data.tokenRole,
-            dbRole: data.dbRole
-          });
-          
-          // Admin girişi başarılı ise geri sayım verilerini getir
-          fetchCountdownData();
-        }
-      } catch (error) {
-        console.error("Admin kontrolü hatası:", error);
-        toast.error("Yetkilendirme kontrolü sırasında bir hata oluştu");
-      }
-    };
-    
-    checkAdminStatus();
-  }, [user, isAdmin, loading, router]);
   
   // Geri sayım verilerini getir
   const fetchCountdownData = async () => {
@@ -241,7 +163,7 @@ export default function AdminPanel() {
         
         if (error.error === "Bu işlem için admin yetkisine sahip olmalısınız") {
           toast.error("Admin yetkiniz doğrulanamadı. Lütfen tekrar giriş yapın.");
-          router.push('/giris');
+          router.push('/login');
         } else {
           toast.error(error.error || "Geri sayım ayarları güncellenemedi");
         }
@@ -425,6 +347,12 @@ export default function AdminPanel() {
     }
   };
 
+  useEffect(() => {
+    if (!authLoading && user && user.role === "admin") {
+      fetchCountdownData();
+    }
+  }, [user, authLoading]);
+
   if (loading) {
     return (
       <PageContainer>
@@ -535,7 +463,7 @@ export default function AdminPanel() {
     <div>
       <div className="mb-4 flex justify-between items-center">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Kullanıcı Yönetimi</h2>
-        <Button size="sm" onClick={() => router.push("/giris")}>Yeni Kullanıcı</Button>
+        <Button size="sm" onClick={() => router.push("/login")}>Yeni Kullanıcı</Button>
       </div>
       
       {loadingState.users ? (
@@ -844,51 +772,69 @@ export default function AdminPanel() {
   );
 
   return (
-    <PageContainer>
-      <div className="flex flex-col md:flex-row">
-        <div className="w-full md:w-64 bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6 md:mb-0 md:mr-6">
-          <div className="space-y-2">
-              <button
-                onClick={() => setActiveTab("dashboard")}
-              className={`flex items-center w-full p-2 rounded-md ${activeTab === "dashboard" ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
-            >
-              <FaChartLine className="mr-2" /> Dashboard
-            </button>
-            <button 
-              onClick={() => setActiveTab("users")}
-              className={`flex items-center w-full p-2 rounded-md ${activeTab === "users" ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
-            >
-              <FaUsers className="mr-2" /> Kullanıcılar
+    <div className="container max-w-7xl mx-auto px-4">
+      <h1 className="text-3xl font-bold mb-4">Admin Paneli</h1>
+      
+      <div className="mb-4">
+        <Button 
+          variant="primary" 
+          onClick={() => router.push('/admin/make-admin')}
+          className="mr-2"
+        >
+          Admin Yetkisi Ver
+        </Button>
+      </div>
+      
+      {loading ? (
+        <div className="flex justify-center my-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+        </div>
+      ) : (
+        <div className="flex flex-col md:flex-row">
+          <div className="w-full md:w-64 bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6 md:mb-0 md:mr-6">
+            <div className="space-y-2">
+                <button
+                  onClick={() => setActiveTab("dashboard")}
+                className={`flex items-center w-full p-2 rounded-md ${activeTab === "dashboard" ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+              >
+                <FaChartLine className="mr-2" /> Dashboard
               </button>
-              <button
-              onClick={() => setActiveTab("plans")}
-              className={`flex items-center w-full p-2 rounded-md ${activeTab === "plans" ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
-            >
-              <FaCalendarAlt className="mr-2" /> Planlar
-              </button>
-              <button
-              onClick={() => setActiveTab("countdown")}
-              className={`flex items-center w-full p-2 rounded-md ${activeTab === "countdown" ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
-            >
-              <FaClock className="mr-2" /> Geri Sayım
-              </button>
-              <button
-                onClick={() => setActiveTab("settings")}
-              className={`flex items-center w-full p-2 rounded-md ${activeTab === "settings" ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
-            >
-              <FaCog className="mr-2" /> Sistem Ayarları
-              </button>
+              <button 
+                onClick={() => setActiveTab("users")}
+                className={`flex items-center w-full p-2 rounded-md ${activeTab === "users" ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+              >
+                <FaUsers className="mr-2" /> Kullanıcılar
+                </button>
+                <button
+                onClick={() => setActiveTab("plans")}
+                className={`flex items-center w-full p-2 rounded-md ${activeTab === "plans" ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+              >
+                <FaCalendarAlt className="mr-2" /> Planlar
+                </button>
+                <button
+                onClick={() => setActiveTab("countdown")}
+                className={`flex items-center w-full p-2 rounded-md ${activeTab === "countdown" ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+              >
+                <FaClock className="mr-2" /> Geri Sayım
+                </button>
+                <button
+                  onClick={() => setActiveTab("settings")}
+                className={`flex items-center w-full p-2 rounded-md ${activeTab === "settings" ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+              >
+                <FaCog className="mr-2" /> Sistem Ayarları
+                </button>
+            </div>
+          </div>
+          
+          <div className="flex-1">
+            {activeTab === "dashboard" && renderDashboard()}
+            {activeTab === "users" && renderUsers()}
+            {activeTab === "plans" && renderPlans()}
+            {activeTab === "countdown" && renderCountdownSettings()}
+            {activeTab === "settings" && renderSettings()}
           </div>
         </div>
-        
-        <div className="flex-1">
-          {activeTab === "dashboard" && renderDashboard()}
-          {activeTab === "users" && renderUsers()}
-          {activeTab === "plans" && renderPlans()}
-          {activeTab === "countdown" && renderCountdownSettings()}
-          {activeTab === "settings" && renderSettings()}
-        </div>
-      </div>
-    </PageContainer>
+      )}
+    </div>
   );
 } 

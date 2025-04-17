@@ -32,31 +32,22 @@ export default function Calendar() {
       try {
         setLoading(true);
         
-        // Kullanıcının katıldığı planlar
-        const joinedResponse = await fetch(`/api/plans?participant=${userId}`);
-        let joinedPlans = [];
+        // Kullanıcının takviminde görünmesi gereken planları getir
+        const response = await fetch(`/api/plans?calendarUser=${userId}`);
         
-        if (joinedResponse.ok) {
-          const data = await joinedResponse.json();
-          joinedPlans = data.plans || [];
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data.plans)) {
+            setPlans(data.plans);
+          } else {
+            console.error("API yanıtı beklenen formatta değil:", data);
+            setPlans([]);
+          }
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Takvim planları alınamadı");
         }
         
-        // Kullanıcının oluşturduğu planlar
-        const createdResponse = await fetch(`/api/plans?creator=${userId}`);
-        let createdPlans = [];
-        
-        if (createdResponse.ok) {
-          const data = await createdResponse.json();
-          createdPlans = data.plans || [];
-        }
-        
-        // Planları birleştir ve tekrar edenleri çıkar
-        const allPlans = [...joinedPlans, ...createdPlans];
-        const uniquePlans = allPlans.filter((plan, index, self) =>
-          index === self.findIndex((p) => p._id === plan._id)
-        );
-        
-        setPlans(uniquePlans);
         setLoading(false);
       } catch (error) {
         console.error("Planları getirme hatası:", error);
@@ -153,8 +144,22 @@ export default function Calendar() {
         body: JSON.stringify({ userId }),
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error("Plandan ayrılma işlemi başarısız oldu");
+        if (response.status === 404) {
+          toast.error("Plan bulunamadı");
+          // Planları yenile - plan zaten kaldırıldıysa
+          setPlans(plans.filter(p => p._id !== planId));
+          return;
+        }
+        
+        if (response.status === 401) {
+          toast.error("Bu işlem için giriş yapmalısınız");
+          return;
+        }
+        
+        throw new Error(data.error || "Plandan ayrılma işlemi başarısız oldu");
       }
       
       // Planları yenile

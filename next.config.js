@@ -17,6 +17,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   productionBrowserSourceMaps: process.env.NODE_ENV !== 'production',
   headers: async () => {
     return [

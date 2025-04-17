@@ -114,82 +114,119 @@ function safeStringify(obj: any): any {
 }
 
 // Plan işlemleri
-export async function getPlans(options: {
-  page?: number;
-  limit?: number;
-  search?: string;
-  isActive?: boolean;
-  isFree?: boolean;
-  isOnline?: boolean;
-  sortField?: string;
-  sortOrder?: 'asc' | 'desc';
-} = {}) {
+export async function getPlans() {
   try {
     connectDB();
     
-    const {
-      page = 1,
-      limit = 10,
-      search,
-      isActive = true,
-      isFree,
-      isOnline,
-      sortField = 'createdAt',
-      sortOrder = 'desc',
-    } = options || {};
+    const plansQuery = Plan.find({ 
+      isActive: true,
+      visibility: 'public',
+      endDate: { $gte: new Date() }
+    })
+    .populate({
+      path: 'creator',
+      select: '_id username firstName lastName profilePicture image',
+    })
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .lean();
     
-    const skip = (page - 1) * limit;
-    
-    // Query oluştur
-    const query: any = { isActive };
-    
-    if (typeof isFree === 'boolean') {
-      query.isFree = isFree;
-    }
-    
-    if (typeof isOnline === 'boolean') {
-      query.isOnline = isOnline;
-    }
-    
-    // Arama filtresi
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { location: { $regex: search, $options: 'i' } },
-      ];
-    }
-    
-    // Sıralama
-    const sort: any = {};
-    sort[sortField] = sortOrder === 'asc' ? 1 : -1;
-    
-    // Planları getir
-    const plans = await Plan.find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .populate('creator', 'username firstName lastName profilePicture')
-      .lean();
-    
-    // Toplam sayı
-    const total = await Plan.countDocuments(query);
+    // Sorgu sonuçlarını al
+    const plans = await plansQuery;
     
     // ObjectId ve Date nesnelerini düz JSON'a çevirme işlemi
     const serializedPlans = safeStringify(plans);
     
-    return {
-      plans: serializedPlans,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return { plans: serializedPlans };
   } catch (error) {
-    console.error('Planları getirme hatası:', error);
-    throw new Error('Planlar getirilirken bir hata oluştu');
+    console.error("Planları getirme hatası:", error);
+    return { plans: "[]" };
+  }
+}
+
+export async function searchPlans(searchParams: { [key: string]: string | string[] | undefined }) {
+  try {
+    connectDB();
+    
+    // Arama parametrelerini analiz et
+    const query: any = {
+      isActive: true,
+      visibility: 'public'
+    };
+    
+    // Gelecekteki planları getir (varsayılan)
+    if (!searchParams.past) {
+      query.endDate = { $gte: new Date() };
+    }
+    
+    // Başlık veya açıklama ile arama
+    if (searchParams.q) {
+      const searchText = Array.isArray(searchParams.q) ? searchParams.q[0] : searchParams.q;
+      if (searchText && searchText.trim() !== '') {
+        query.$or = [
+          { title: { $regex: searchText, $options: 'i' } },
+          { description: { $regex: searchText, $options: 'i' } }
+        ];
+      }
+    }
+    
+    // Kategorilere göre filtreleme
+    if (searchParams.category && searchParams.category !== 'all') {
+      const category = Array.isArray(searchParams.category) 
+        ? searchParams.category[0] 
+        : searchParams.category;
+      
+      if (category) {
+        query.category = category;
+      }
+    }
+    
+    // Belirlenen sıralama seçenekleri
+    const sortOptions: Record<string, any> = {
+      recent: { createdAt: -1 },
+      upcoming: { startDate: 1 },
+      popular: { joinedCount: -1 },
+      mostLiked: { likeCount: -1 }
+    };
+    
+    // Sıralama seçeneğini belirle (varsayılan: recent)
+    let sortOption = sortOptions.recent;
+    if (searchParams.sort && typeof searchParams.sort === 'string') {
+      const sortKey = searchParams.sort as keyof typeof sortOptions;
+      sortOption = sortOptions[sortKey] || sortOptions.recent;
+    }
+    
+    // Planları getir
+    let plansQuery = Plan.find(query)
+      .populate({
+        path: 'creator',
+        select: '_id username firstName lastName profilePicture image',
+      })
+      .sort(sortOption)
+      .lean();
+    
+    // Limit uygula (varsayılan: 100)
+    let limit = 100;
+    if (searchParams.limit) {
+      const paramLimit = parseInt(
+        Array.isArray(searchParams.limit) ? searchParams.limit[0] : searchParams.limit
+      );
+      if (!isNaN(paramLimit) && paramLimit > 0) {
+        limit = Math.min(paramLimit, 100); // Maksimum 100 plan
+      }
+    }
+    plansQuery = plansQuery.limit(limit);
+    
+    // Sorgu sonuçlarını al
+    const plans = await plansQuery;
+    
+    // ObjectId ve Date nesnelerini düz JSON'a çevirme işlemi
+    const serializedPlans = safeStringify(plans);
+    
+    return { plans: serializedPlans };
+  } catch (error) {
+    console.error("Plan arama hatası:", error);
+    return { plans: "[]" };
   }
 }
 
@@ -235,14 +272,15 @@ export async function getUserPlans(userId: string) {
     } else {
       // Google ID ise oauth_creator_id alanında ara
       query.oauth_creator_id = userId;
-      
-      // Ayrıca string olarak creator alanında da kontrol et
-      // query.creator = userId; // Bu satırı kaldırdık
     }
     
     console.log("Sorgu:", JSON.stringify(query));
     
     const plans = await Plan.find(query)
+      .populate({
+        path: 'creator',
+        select: '_id username firstName lastName profilePicture image',
+      })
       .sort({ createdAt: -1 })
       .lean();
     
@@ -273,6 +311,10 @@ export async function getUserSavedPlans(userId: string) {
     const plans = await Plan.find({ 
       isActive: true,
       saves: userId.toString()
+    })
+    .populate({
+      path: 'creator',
+      select: '_id username firstName lastName profilePicture image',
     })
     .sort({ createdAt: -1 })
     .lean();
@@ -322,6 +364,10 @@ export async function getUserParticipatingPlans(userId: string) {
     }
     
     const plans = await Plan.find(query)
+      .populate({
+        path: 'creator',
+        select: '_id username firstName lastName profilePicture image',
+      })
       .sort({ startDate: 1 })
       .lean();
     
@@ -521,33 +567,28 @@ export async function likePlan({
 }) {
   try {
     connectDB();
-
-    const plan = await Plan.findById(planId);
     
-    if (!plan) {
-      throw new Error('Plan bulunamadı');
-    }
-
-    // Kullanıcı beğenmiş mi kontrol et
-    const userLikedIdx = plan.likes?.findIndex((id: any) => 
-      id === userId || (id && id.toString && id.toString() === userId)
+    // findById ve update işlemini birleştirerek daha verimli hale getiriyoruz
+    const result = await Plan.findByIdAndUpdate(
+      planId,
+      [
+        {
+          $set: {
+            likes: {
+              $cond: [
+                { $in: [userId, { $ifNull: ["$likes", []] }] },
+                { $filter: { input: { $ifNull: ["$likes", []] }, cond: { $ne: ["$$this", userId] } } },
+                { $concatArrays: [{ $ifNull: ["$likes", []] }, [userId]] }
+              ]
+            }
+          }
+        }
+      ],
+      { new: true }
     );
     
-    const userLiked = userLikedIdx !== -1 && userLikedIdx !== undefined;
-
-    if (userLiked) {
-      // Kullanıcı halihazırda beğenmişse, beğeniyi kaldır
-      plan.likes = (plan.likes?.filter((id: any) => 
-        id !== userId && (!id || !id.toString || id.toString() !== userId)
-      ) || []) as any[];
-      
-      await plan.save();
-    } else {
-      // Kullanıcı beğenmemişse, beğeni ekle
-      plan.likes = plan.likes || [];
-      (plan.likes as any[]).push(userId);
-      
-      await plan.save();
+    if (!result) {
+      throw new Error('Plan bulunamadı');
     }
 
     return { success: true };
@@ -566,33 +607,28 @@ export async function savePlan({
 }) {
   try {
     connectDB();
-
-    const plan = await Plan.findById(planId);
     
-    if (!plan) {
-      throw new Error('Plan bulunamadı');
-    }
-
-    // Kullanıcı kaydetmiş mi kontrol et
-    const userSavedIdx = plan.saves?.findIndex((id: any) => 
-      id === userId || (id && id.toString && id.toString() === userId)
+    // findById ve update işlemini birleştirerek daha verimli hale getiriyoruz
+    const result = await Plan.findByIdAndUpdate(
+      planId,
+      [
+        {
+          $set: {
+            saves: {
+              $cond: [
+                { $in: [userId, { $ifNull: ["$saves", []] }] },
+                { $filter: { input: { $ifNull: ["$saves", []] }, cond: { $ne: ["$$this", userId] } } },
+                { $concatArrays: [{ $ifNull: ["$saves", []] }, [userId]] }
+              ]
+            }
+          }
+        }
+      ],
+      { new: true }
     );
     
-    const userSaved = userSavedIdx !== -1 && userSavedIdx !== undefined;
-
-    if (userSaved) {
-      // Kullanıcı halihazırda kaydetmişse, kaydı kaldır
-      plan.saves = (plan.saves?.filter((id: any) => 
-        id !== userId && (!id || !id.toString || id.toString() !== userId)
-      ) || []) as any[];
-      
-      await plan.save();
-    } else {
-      // Kullanıcı kaydetmemişse, kayıt ekle
-      plan.saves = plan.saves || [];
-      (plan.saves as any[]).push(userId);
-      
-      await plan.save();
+    if (!result) {
+      throw new Error('Plan bulunamadı');
     }
 
     return { success: true };
@@ -606,10 +642,7 @@ export async function getUserLikedPlans(userId: string) {
   try {
     connectDB();
     
-    console.log("getUserLikedPlans çağrıldı, userId:", userId);
-    
     if (!userId) {
-      console.log("getUserLikedPlans: userId boş");
       return { plans: [] };
     }
     
@@ -618,10 +651,12 @@ export async function getUserLikedPlans(userId: string) {
       isActive: true,
       likes: userId.toString()
     })
+    .populate({
+      path: 'creator',
+      select: '_id username firstName lastName profilePicture image',
+    })
     .sort({ createdAt: -1 })
     .lean();
-    
-    console.log("Bulunan beğenilen planlar:", plans.length);
     
     // ObjectId ve Date nesnelerini düz JSON'a çevirme işlemi
     const serializedPlans = safeStringify(plans);

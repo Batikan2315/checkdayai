@@ -268,118 +268,129 @@ const Navbar: React.FC = () => {
     </div>
   );
 
+  // Profil resmi için yardımcı fonksiyon
+  const getProfileImage = () => {
+    if (!session?.user) return null;
+    
+    // Profil resmi kontrolü
+    if (session.user.image) return session.user.image;
+    
+    // Eğer custom user verisi varsa
+    if (session.user.profilePicture) return session.user.profilePicture;
+    
+    // Google profil resmi yoktur, custom tip tanımında olmadığı için kaldırıyoruz
+    
+    // Varsayılan avatar
+    return "/images/avatars/default.png";
+  };
+
   return (
-    <>
-      {/* Mobil menü - Üst kısımda logo ve bildirim */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700 block sm:hidden">
-        <div className="flex justify-between items-center h-16 px-4">
-          <Link href="/" className="flex items-center">
-            <span className="font-bold text-2xl bg-gradient-to-r from-blue-600 to-blue-400 text-transparent bg-clip-text">
-              check<span className="font-extrabold">day</span>
-            </span>
-            <span className="ml-1 text-lg text-gray-500 dark:text-gray-400 font-light">ai</span>
+    <nav className="fixed bottom-0 left-0 right-0 md:top-0 md:bottom-auto bg-white dark:bg-gray-900 shadow-lg z-50">
+      <div className="container mx-auto p-2">
+        {/* Masaüstü görünümü */}
+        <div className="hidden md:flex justify-between items-center">
+          <Link
+            href="/"
+            className="text-xl font-bold text-blue-600 dark:text-blue-400 logo"
+          >
+            checkday
           </Link>
-          <div className="flex items-center">
-            {session && renderNotificationButton()}
-          </div>
-        </div>
-      </div>
-
-      {/* Mobil menü - Alt kısımda gezinme menüsü */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 dark:bg-gray-800 dark:border-gray-700 block sm:hidden">
-        <div className="flex justify-around items-center h-16">
-          {menuItems.map((item) => (
-            <Link
-              href={item.href}
-              key={item.name}
-              className={twMerge(
-                "flex flex-col items-center justify-center h-full px-2 text-sm",
-                pathname === item.href
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-              )}
-            >
-              {item.icon}
-              <span className="text-xs mt-1">{item.name}</span>
-              {item.highlight && (
-                <span className="absolute top-0 right-1/4 h-2 w-2 bg-blue-500 rounded-full"></span>
-              )}
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* Desktop menü - Üst kısımda sabit */}
-      <div className="hidden sm:block fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-        <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="flex items-center">
-                <span className="font-bold text-2xl bg-gradient-to-r from-blue-600 to-blue-400 text-transparent bg-clip-text">
-                  check<span className="font-extrabold">day</span>
-                </span>
-                <span className="ml-1 text-lg text-gray-500 dark:text-gray-400 font-light">ai</span>
-              </Link>
-              <div className="ml-10 flex items-center space-x-4">
-                {menuItems.slice(0, 4).map((item) => (
-                  <Link
-                    href={item.href}
-                    key={item.name}
-                    className={twMerge(
-                      "flex items-center px-3 py-2 rounded-md text-sm font-medium",
-                      pathname === item.href
-                        ? "bg-blue-100 text-blue-600 dark:bg-gray-700 dark:text-blue-400"
-                        : "text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700",
-                      item.highlight && "border border-blue-400 dark:border-blue-500"
-                    )}
-                  >
-                    <span className="mr-2">{item.icon}</span>
-                    {item.name}
-                    {item.highlight && (
-                      <span className="ml-1 text-xs font-semibold text-white bg-blue-500 rounded-full px-1.5">Yeni</span>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              {session && renderNotificationButton()}
+          <div className="flex items-center space-x-6">
+            {menuItems.map((item) => (
               <Link
-                href={session ? "/profile" : "/login"}
+                key={item.name}
+                href={item.href}
                 className={twMerge(
-                  "flex items-center px-3 py-2 rounded-md text-sm font-medium",
-                  pathname === (session ? "/profile" : "/login")
-                    ? "bg-blue-100 text-blue-600 dark:bg-gray-700 dark:text-blue-400"
-                    : "text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  "flex flex-col items-center text-gray-500 dark:text-gray-400 hover:text-blue-600 font-medium",
+                  pathname === item.href &&
+                    "text-blue-600 dark:text-blue-400",
+                  item.highlight &&
+                    "text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
                 )}
               >
-                {session && session.user?.image ? (
-                  <img 
-                    src={`${session.user.image}?t=${Date.now()}`}
-                    alt="Profil" 
-                    className="w-6 h-6 rounded-full mr-2"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.onerror = null; // Sonsuz döngüyü engelle
-                      target.src = "/images/avatars/default.png"; // Yedek resim
-                    }}
-                  />
-                ) : (
-                  <span className="mr-2">{menuItems[4].icon}</span>
-                )}
-                {session ? (session.user?.name || "Profil") : "Giriş Yap"}
+                {item.icon}
+                <span className="text-sm">{item.name}</span>
               </Link>
-            </div>
+            ))}
+            {session && renderNotificationButton()}
+            {session?.user && (
+              <Link href="/profile" className="ml-2">
+                <img
+                  src={getProfileImage() || "/images/avatars/default.png"}
+                  alt="Profil"
+                  className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-700"
+                />
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Mobil görünümü */}
+        <div className="md:hidden">
+          {/* Mobil üst çubuk - logo ve bildirim */}
+          <div className="flex justify-between items-center pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
+            <Link href="/" className="text-lg font-bold text-blue-600 dark:text-blue-400">
+              checkday
+            </Link>
+            {session && (
+              <div className="flex items-center">
+                {renderNotificationButton()}
+              </div>
+            )}
+          </div>
+          
+          {/* Mobil alt çubuk - menü öğeleri */}
+          <div className="flex justify-around items-center">
+            {menuItems.map((item, index) => {
+              // Profil için özel koşul: Kullanıcı giriş yapmışsa
+              if (item.name === "Profil" && session?.user) {
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={twMerge(
+                      "flex flex-col items-center text-gray-500 dark:text-gray-400 hover:text-blue-600 font-medium py-1",
+                      pathname === item.href && "text-blue-600 dark:text-blue-400"
+                    )}
+                  >
+                    <img
+                      src={getProfileImage() || "/images/avatars/default.png"}
+                      alt="Profil"
+                      className="w-6 h-6 rounded-full object-cover border border-gray-200 dark:border-gray-700"
+                    />
+                    <span className="text-xs mt-1">{item.name}</span>
+                  </Link>
+                );
+              }
+              
+              // Diğer menü öğeleri için normal görünüm
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={twMerge(
+                    "flex flex-col items-center text-gray-500 dark:text-gray-400 hover:text-blue-600 font-medium py-1",
+                    pathname === item.href && "text-blue-600 dark:text-blue-400",
+                    item.highlight &&
+                      "text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
+                  )}
+                >
+                  {item.icon}
+                  <span className="text-xs mt-1">{item.name}</span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>
-
-      {/* Mobil menü için alt ve üst boşluk */}
-      <div className="block sm:hidden h-16"></div>
       
-      {/* Desktop menü için üst boşluk */}
-      <div className="hidden sm:block h-16"></div>
-    </>
+      {/* Bildirim paneli */}
+      {showNotifications && (
+        <div className="fixed inset-0 z-50 flex justify-end md:justify-center items-start pt-16 md:pt-20 bg-black bg-opacity-50">
+          {/* Bildirim paneli içeriği */}
+        </div>
+      )}
+    </nav>
   );
 };
 

@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { redirect } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 export default function AdminLayout({
   children,
@@ -12,42 +13,59 @@ export default function AdminLayout({
   const { data: session, status } = useSession();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const router = useRouter();
 
+  // Session durumunu ve admin kontrolünü yönet
   useEffect(() => {
     async function checkAdminStatus() {
       try {
-        // MongoDB'deki gerçek rol bilgisini al
-        const response = await fetch('/api/auth/check-admin');
-        const data = await response.json();
-        
-        // Token ve veritabanı rolleri arasındaki tutarsızlığı logla
-        if (data.tokenRole !== data.dbRole) {
-          console.warn("Rol tutarsızlığı tespit edildi:", {
-            tokenRole: data.tokenRole,
-            dbRole: data.dbRole
-          });
+        // Oturum yoksa login sayfasına yönlendir
+        if (status === "unauthenticated") {
+          router.push('/login?callbackUrl=/admin');
+          return;
         }
         
-        setIsAdmin(data.isAdmin);
+        // Oturum yükleniyor ise bekle
+        if (status === "loading") {
+          return;
+        }
+        
+        // MongoDB'deki gerçek rol bilgisini al
+        const response = await fetch('/api/auth/check-admin', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error("Admin kontrolü yapılamadı");
+        }
+        
+        const data = await response.json();
+        
+        // Admin yetkisi yok ise ana sayfaya yönlendir
+        if (!data.isAdmin) {
+          router.push('/');
+          return;
+        }
+        
+        // Admin yetkisi varsa sayfayı göster
+        setIsAdmin(true);
         setLoading(false);
       } catch (error) {
-        console.error("Admin kontrolü sırasında hata:", error);
+        // Hata durumunda, kullanıcıyı giriş sayfasına yönlendir
+        router.push('/login?callbackUrl=/admin');
+      } finally {
         setLoading(false);
       }
     }
 
-    if (status === "loading") {
-      // Oturum henüz yükleniyor, bekle
-      return;
-    } else if (status === "unauthenticated") {
-      // Giriş yapılmamış, anasayfaya yönlendir
-      redirect("/giris");
-    } else {
-      // Oturum yüklendi, admin kontrolü yap
-      checkAdminStatus();
-    }
-  }, [status]);
+    // Oturum durumuna göre admin kontrolü başlat
+    checkAdminStatus();
+  }, [status, router]);
 
+  // Yükleniyor ise loading göster
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -56,9 +74,11 @@ export default function AdminLayout({
     );
   }
 
+  // Admin değilse hiçbir şey gösterme (router.push ile yönlendirme yapıldı)
   if (!isAdmin) {
-    redirect("/");
+    return null;
   }
 
+  // Admin ise children'ı render et
   return <>{children}</>;
 } 

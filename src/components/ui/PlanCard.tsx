@@ -6,6 +6,7 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import { toast } from "react-hot-toast";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { PlanActions } from "@/components/PlanActions";
 
 interface CreatorInfo {
   _id?: string;
@@ -13,6 +14,9 @@ interface CreatorInfo {
   firstName?: string;
   lastName?: string;
   profilePicture?: string;
+  image?: string;
+  googleProfilePicture?: string;
+  name?: string;
 }
 
 interface PlanCardProps {
@@ -72,42 +76,49 @@ export default function PlanCard({
   const [saving, setSaving] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   
-  // Creator bilgilerini güvenli bir şekilde işle
+  // Creator bilgileri için değerler
   const creatorName = useMemo(() => {
-    if (!creator) return 'İsimsiz';
+    if (!creator) return "Kullanıcı";
     
     if (creator.firstName && creator.lastName) {
       return `${creator.firstName} ${creator.lastName}`;
     }
     
-    if (creator.username) {
-      return `@${creator.username}`;
+    if (creator.firstName) {
+      return creator.firstName;
     }
     
-    return 'İsimsiz';
+    if (creator.username) {
+      return creator.username;
+    }
+    
+    return "Kullanıcı";
   }, [creator]);
   
   const creatorUsername = useMemo(() => {
-    if (!creator || !creator.username) return '';
+    if (!creator || !creator.username) return "";
     return `@${creator.username}`;
   }, [creator]);
   
   const creatorAvatar = useMemo(() => {
-    if (!creator) return "/images/avatars/default.png";
+    if (!creator) return `/images/avatars/default.png`;
     
-    // Profil resmi varsa ve hata yoksa kullan
-    if (creator.profilePicture && !avatarError) {
-      return `${creator.profilePicture}?t=${new Date().getTime()}`;
+    if (creator.profilePicture) {
+      return creator.profilePicture;
     }
     
-    return "/images/avatars/default.png";
-  }, [creator, avatarError]);
+    if (creator.image) {
+      return creator.image;
+    }
+    
+    return `/images/avatars/default.png`;
+  }, [creator]);
   
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const isOwner = userId && creator && (
     creator._id === userId || 
-    (typeof creator === 'object' && creator._id && userId === creator._id) ||
+    (typeof creator === 'object' && creator._id && userId === creator._id.toString()) ||
     (typeof creator === 'string' && userId === creator)
   );
   const router = useRouter();
@@ -173,10 +184,13 @@ export default function PlanCard({
   };
 
   const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    console.error("Profil resmi yüklenemedi, creator ID:", creator?._id);
     setAvatarError(true);
-    console.log("Avatar yüklenemedi, varsayılan avatar gösteriliyor");
     e.currentTarget.src = "/images/avatars/default.png";
+    
+    // 5 saniye sonra tekrar yüklemeyi dene
+    setTimeout(() => {
+      setAvatarError(false);
+    }, 5000);
   };
 
   const handleClickDetails = (e: React.MouseEvent) => {
@@ -323,6 +337,61 @@ export default function PlanCard({
     }
   };
 
+  // Avatar resmi için yardımcı fonksiyon
+  const getAvatarUrl = () => {
+    if (!creator) return `/images/avatars/default.png`;
+    
+    if (typeof creator === 'object') {
+      // İlk tercih: profil resmi
+      if (creator.profilePicture) return creator.profilePicture;
+      
+      // İkinci tercih: Google profil resmi
+      if (creator.googleProfilePicture) return creator.googleProfilePicture;
+      
+      // Üçüncü tercih: image alanı (NextAuth)
+      if (creator.image) return creator.image;
+    }
+    
+    // Varsayılan resim
+    return `/images/avatars/default.png`;
+  };
+
+  // Kullanıcı adını belirleme yardımcı fonksiyonu
+  const getCreatorName = (creator: CreatorInfo | null | undefined) => {
+    if (!creator) return "Bilinmeyen";
+    
+    // Kullanıcı adı varsa göster
+    if (creator.username) return creator.username;
+    
+    // İsim ve soyisim varsa göster
+    if (creator.firstName && creator.lastName) 
+      return `${creator.firstName} ${creator.lastName}`;
+    
+    // Sadece isim varsa
+    if (creator.firstName) return creator.firstName;
+    
+    // NextAuth name özelliği varsa
+    if (creator.name) return creator.name;
+    
+    // ID'si varsa göster
+    if (creator._id) return creator._id;
+    
+    return "Bilinmeyen";
+  };
+
+  // Profil resmi için güvenli kontrol
+  const getCreatorImage = (creator: CreatorInfo | null | undefined) => {
+    if (!creator) return "/images/avatars/default.png";
+    
+    // Profil resmi varsa
+    if (creator.profilePicture) return creator.profilePicture;
+    
+    // Google'dan gelen resim
+    if (creator.image) return creator.image;
+    
+    return "/images/avatars/default.png";
+  };
+
   return (
     <div className="cursor-pointer h-full">
       <Card className="overflow-hidden h-full flex flex-col hover:shadow-lg transition-shadow duration-300">
@@ -330,28 +399,10 @@ export default function PlanCard({
           <CardHeader className="p-0">
             {/* Creator bilgisi - Instagram benzeri başlık */}
             <div className="px-3 py-2 flex items-center border-b border-gray-100">
-              <div className="w-8 h-8 rounded-full overflow-hidden mr-2 bg-gray-200 flex-shrink-0">
-                <img 
-                  src={creatorAvatar}
-                  alt={creator?.username || 'Kullanıcı'}
-                  className="w-full h-full object-cover"
-                  onError={handleAvatarError}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (creator?.username) {
-                      router.push(`/@${creator.username}`);
-                    }
-                  }}
-                  style={{ cursor: creator?.username ? 'pointer' : 'default' }}
-                />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-medium text-sm text-gray-900 dark:text-white">
-                  {creatorName}
-                </span>
-                {creatorUsername && (
-                  <span 
-                    className="text-xs text-gray-500 hover:text-blue-500 hover:underline cursor-pointer" 
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center">
+                  <div 
+                    className="w-8 h-8 rounded-full overflow-hidden mr-3 cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
                       if (creator?.username) {
@@ -359,15 +410,38 @@ export default function PlanCard({
                       }
                     }}
                   >
-                    {creatorUsername}
+                    <img 
+                      src={getAvatarUrl()}
+                      alt={getCreatorName(creator)}
+                      className="w-full h-full object-cover"
+                      onError={handleAvatarError}
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm text-gray-900 dark:text-white">
+                      {getCreatorName(creator)}
+                    </span>
+                    {creatorUsername && (
+                      <span 
+                        className="text-xs text-gray-500 hover:text-blue-500 hover:underline cursor-pointer" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (creator?.username) {
+                            router.push(`/@${creator.username}`);
+                          }
+                        }}
+                      >
+                        {creatorUsername}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {isOwner && (
+                  <span className="ml-auto bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-300">
+                    Lider
                   </span>
                 )}
               </div>
-              {isOwner && (
-                <span className="ml-auto bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-300">
-                  Lider
-                </span>
-              )}
             </div>
             
             {/* Plan görüntüsü - Optimize boyut */}
@@ -426,24 +500,7 @@ export default function PlanCard({
               
               {/* Katıl/Katıldınız veya Plan Odası butonu */}
               <div className="mt-auto pt-4">
-                {isOwner || isJoined ? (
-                  <Button 
-                    variant="primary" 
-                    className="w-full" 
-                    onClick={handleGoToRoom}
-                  >
-                    Plan Odası
-                  </Button>
-                ) : (
-                  <Button 
-                    variant="primary" 
-                    className="w-full" 
-                    onClick={handleJoin} 
-                    disabled={joining}
-                  >
-                    {joining ? "İşlem yapılıyor..." : "Katıl"}
-                  </Button>
-                )}
+                <PlanActions plan={{ _id: id, participants: [], creator: creator }} />
               </div>
             </div>
             
