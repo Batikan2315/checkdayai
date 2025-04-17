@@ -4,7 +4,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/auth';
 import mongoose from 'mongoose';
 import { ObjectId } from 'mongodb';
-import { IPlan } from '@/lib/types';
 
 // Plan dökümanı tipi
 interface PlanDoc {
@@ -37,8 +36,16 @@ export async function POST(
       );
     }
 
-    const userId = session.user.id;
+    // Kullanıcı ID'sini al - birden fazla alandan kontrol et
+    const userId = session.user.id || (session.user as any)._id;
     const planId = params.planId;
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Kullanıcı kimliği bulunamadı' },
+        { status: 401, headers }
+      );
+    }
 
     if (!planId || !mongoose.Types.ObjectId.isValid(planId)) {
       return NextResponse.json(
@@ -47,14 +54,43 @@ export async function POST(
       );
     }
 
-    // Veritabanına bağlan
-    await connectDB();
+    // MongoDB bağlantısı başarısız olursa hata dön
+    try {
+      await connectDB();
+    } catch (dbError) {
+      console.error('MongoDB bağlantı hatası:', dbError);
+      return NextResponse.json(
+        { error: 'Veritabanı bağlantısı kurulamadı' },
+        { status: 500, headers }
+      );
+    }
 
-    const Plan = mongoose.model('Plan');
-    const User = mongoose.model('User');
+    // Collection adları ve model kullanımı
+    let Plan;
+    let User;
+    
+    try {
+      Plan = mongoose.models.Plan || mongoose.model('Plan');
+      User = mongoose.models.User || mongoose.model('User');
+    } catch (modelError) {
+      console.error('Model oluşturma hatası:', modelError);
+      return NextResponse.json(
+        { error: 'Model oluşturma hatası' },
+        { status: 500, headers }
+      );
+    }
 
     // Plan var mı kontrol et
-    const plan = await Plan.findById(planId) as PlanDoc;
+    let plan;
+    try {
+      plan = await Plan.findById(planId) as PlanDoc;
+    } catch (findError) {
+      console.error('Plan arama hatası:', findError);
+      return NextResponse.json(
+        { error: 'Plan arama hatası' },
+        { status: 500, headers }
+      );
+    }
     
     if (!plan) {
       return NextResponse.json(
@@ -63,15 +99,38 @@ export async function POST(
       );
     }
 
-    // Kullanıcıyı bul - Önce normal ID ile ara, bulamazsan oauth_id/googleId ile ara
-    let user = await User.findById(userId);
-    
-    if (!user) {
-      user = await User.findOne({ oauth_id: userId });
+    // Plan nesnesi kontrolü
+    if (!plan.calendarUsers) {
+      plan.calendarUsers = [];
     }
-    
-    if (!user) {
-      user = await User.findOne({ googleId: userId });
+
+    let user;
+    try {
+      // Kullanıcıyı farklı ID formatlarıyla arama
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        user = await User.findById(userId);
+      }
+      
+      // ID ile bulunamadıysa, email ile ara
+      if (!user && session.user.email) {
+        user = await User.findOne({ email: session.user.email });
+      }
+      
+      // Hala bulunamadıysa oauth_id ile ara
+      if (!user) {
+        user = await User.findOne({ oauth_id: userId });
+      }
+      
+      // Son çare olarak googleId ile ara
+      if (!user && session.user.email) {
+        user = await User.findOne({ email: session.user.email });
+      }
+    } catch (userFindError) {
+      console.error('Kullanıcı arama hatası:', userFindError);
+      return NextResponse.json(
+        { error: 'Kullanıcı arama hatası' },
+        { status: 500, headers }
+      );
     }
     
     if (!user) {
@@ -95,15 +154,33 @@ export async function POST(
       );
     }
 
-    // Plana takvim kullanıcısı olarak ekle
-    plan.calendarUsers.push(user._id);
-    await plan.save();
+    try {
+      // Plana takvim kullanıcısı olarak ekle
+      plan.calendarUsers.push(user._id);
+      await plan.save();
+    } catch (planSaveError) {
+      console.error('Plan güncelleme hatası:', planSaveError);
+      return NextResponse.json(
+        { error: 'Plan güncelleme hatası' },
+        { status: 500, headers }
+      );
+    }
 
-    // Kullanıcı bilgilerini güncelle
-    await User.findByIdAndUpdate(
-      user._id,
-      { $addToSet: { calendarPlans: new ObjectId(planId) } }
-    );
+    try {
+      // Kullanıcı modeli calendarPlans alanı yoksa oluştur
+      if (!user.calendarPlans) {
+        user.calendarPlans = [];
+      }
+      
+      // Kullanıcı bilgilerini güncelle
+      await User.findByIdAndUpdate(
+        user._id,
+        { $addToSet: { calendarPlans: new ObjectId(planId) } }
+      );
+    } catch (userUpdateError) {
+      console.error('Kullanıcı güncelleme hatası:', userUpdateError);
+      // Kullanıcı güncellemesi başarısız olsa bile devam et
+    }
 
     return NextResponse.json(
       { message: 'Plan takviminize eklendi' },

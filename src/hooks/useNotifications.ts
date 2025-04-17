@@ -85,21 +85,39 @@ export default function useNotifications() {
     type?: string,
     force?: boolean
   }) => {
-    if (!session || !user) return;
+    if (!session || !user) {
+      console.log('Kullanıcı giriş yapmadı, API isteği engelleniyor');
+      return;
+    }
     
     // Zaten yükleniyor durumundaysa tekrar istek yapma
-    if (loading) return;
+    if (loading) {
+      console.log('Zaten bildirimler yükleniyor, istek atlanıyor');
+      return;
+    }
+    
+    // Zaten yüklenmiş ise ve force değilse yeni istek yapma
+    if (initialLoadDoneRef.current && !options?.force && notifications.length > 0) {
+      console.log('Bildirimler zaten yüklendi, tekrar çağrılmıyor');
+      return;
+    }
     
     // API çağrısı sınırlama
     apiCallCounter++;
     if (apiCallCounter > 10 && !issuedApiWarning) {
       console.warn(`⚠️ Çok fazla API çağrısı yapıldı: ${apiCallCounter}`);
       issuedApiWarning = true;
+      
+      // Çok fazla istek varsa bir süre engelle
+      if (apiCallCounter > 20 && !options?.force) {
+        console.log('Çok fazla istek yapıldı, API istekleri geçici olarak engellendi');
+        return;
+      }
     }
     
-    // Çok sık yenileme yapılmasını engelle (en az 30 saniye ara ile - 10 saniye yerine)
+    // Çok sık yenileme yapılmasını engelle (en az 60 saniye ara ile)
     const now = Date.now();
-    if (!options?.force && now - lastFetchRef.current < 30000) {
+    if (!options?.force && now - lastFetchRef.current < 60000) {
       console.log('Çok sık bildirim sorgulaması engellendi');
       return;
     }
@@ -189,7 +207,7 @@ export default function useNotifications() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, user, pagination, activeType, loading]);
+  }, [session, user, pagination, activeType, loading, notifications.length]);
 
   // Bildirimi okundu olarak işaretle
   const markAsRead = useCallback(async (notificationId: string) => {
@@ -364,7 +382,7 @@ export default function useNotifications() {
     if (!session || !user) return;
     
     // Zaten yüklenmiş mi kontrol et
-    if (initialLoadDoneRef.current) {
+    if (initialLoadDoneRef.current && notifications.length > 0) {
       console.log("Bildirimler zaten yüklendi, tekrar çağrılmıyor");
       return;
     }
@@ -376,7 +394,7 @@ export default function useNotifications() {
     // WebSocket ile bildirim dinleme VEYA polling mekanizması
     let pollingInterval: NodeJS.Timeout | null = null;
     
-    // WebSocket bağlantısı varsa dinleyicileri ekle
+    // WebSocket bağlantısı kontrol et
     if (socket && isConnected) {
       console.log("Socket bağlantısı aktif: WebSocket bildirim dinleyicisi ekleniyor");
       
@@ -392,37 +410,38 @@ export default function useNotifications() {
       socket.on('refresh_notifications', () => {
         fetchNotifications({ force: true });
       });
-      
-      return () => {
-        console.log("Socket bildirim dinleyicisi kaldırılıyor");
-        socket.off('notification', handleNewNotification);
-        socket.off('refresh_notifications');
-        
-        // Polling mekanizması varsa temizle
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-        }
-      };
-    } 
-    // WebSocket bağlantısı yoksa polling mekanizması kullan
-    else {
+    } else {
       console.log("WebSocket kullanılamıyor, polling mekanizması devrede");
       
-      // Polling mekanizmasını başlat - 60 saniyede bir bildirim kontrolü (30 saniye yerine)
+      // Polling mekanizmasını başlat - 60 saniyede bir bildirim kontrolü
       pollingInterval = setInterval(() => {
         console.log("Polling bildirim kontrolü yapılıyor");
         fetchNotifications({ force: true });
-      }, 60000); 
+      }, 60000);
       
-      return () => {
-        // Polling mekanizmasını temizle
+      // Polling için maksimum 5 dakika süre
+      setTimeout(() => {
         if (pollingInterval) {
           clearInterval(pollingInterval);
           console.log("Polling mekanizması durduruldu");
         }
-      };
+      }, 5 * 60 * 1000);
     }
-  // fetchNotifications'ı dependency dizisinden çıkar
+    
+    // Cleanup fonksiyonu
+    return () => {
+      // WebSocket bağlantısı temizleme
+      if (socket && isConnected) {
+        socket.off('notification');
+        socket.off('refresh_notifications');
+      }
+      
+      // Polling interval temizleme
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, user, socket, isConnected]);
 
   // Sayfa değiştiğinde bildirimleri getir

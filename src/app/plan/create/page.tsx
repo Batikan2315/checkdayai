@@ -371,22 +371,34 @@ export default function CreatePlan() {
       // Planı otomatik olarak kullanıcının takvimine ekle
       if (createdPlan?._id) {
         try {
-          await fetch(`/api/calendar/add/${createdPlan._id}`, {
+          // Takvime ekleme kısmı bir hata durumunda geri dönmemeli
+          const calendarResponse = await fetch(`/api/calendar/add/${createdPlan._id}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ userId }),
+            // Body boş olabilir - session verilerinden kullanıcı ID alınacak
           });
-          console.log("Plan takvime otomatik olarak eklendi");
+          
+          if (calendarResponse.ok) {
+            console.log("Plan takvime otomatik olarak eklendi");
+          } else {
+            // Hata olursa loglama yap ama kullanıcıya gösterme
+            console.warn("Takvime ekleme başarısız: ", await calendarResponse.text());
+          }
         } catch (calendarError) {
           console.error("Takvime ekleme hatası:", calendarError);
           // Takvime ekleme başarısız olsa bile plana devam et
         }
       }
       
-      toast.success("Plan başarıyla oluşturuldu!");
-      router.push("/plans");
+      // İşlem başarıyla tamamlandı, kullanıcıyı yönlendir
+      toast.success('Plan başarıyla oluşturuldu!');
+      if (createdPlan?._id) {
+        router.push(`/plan/${createdPlan._id}`);
+      } else {
+        router.push('/plans');
+      }
     } catch (error: any) {
       console.error("Plan oluşturma hatası:", error);
       toast.error(error.message || "Plan oluşturulurken bir hata oluştu");

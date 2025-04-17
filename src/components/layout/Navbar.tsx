@@ -326,7 +326,7 @@ const Navbar: React.FC = () => {
         </div>
 
         {/* Mobil görünümü */}
-        <div className="md:hidden">
+        <div className="flex flex-col md:hidden">
           {/* Mobil üst çubuk - logo ve bildirim */}
           <div className="flex justify-between items-center pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
             <Link href="/" className="text-lg font-bold text-blue-600 dark:text-blue-400">

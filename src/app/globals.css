@@ -32,13 +32,33 @@ nav img {
 }
 
 /* Mobil menü iyileştirmeleri */
-nav .logo {
-  display: none;
+nav {
+  height: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+@media (max-width: 767px) {
+  /* Mobil menü ayarları */
+  nav {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+  }
+  
+  /* İçerik alanını alt menü için ayarla */
+  main {
+    padding-bottom: 6rem;
+  }
 }
 
 @media (min-width: 768px) {
   nav .logo {
     display: block;
+  }
+  
+  /* Masaüstü görünümünde içerik alanını üst menü için ayarla */
+  main {
+    padding-top: 4rem;
   }
 }
 
