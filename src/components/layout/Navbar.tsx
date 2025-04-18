@@ -272,9 +272,16 @@ const Navbar: React.FC = () => {
               )}
 
               {session ? (
-                <Link href="/profile">
-                  <div className="flex items-center cursor-pointer">
-                    <div className="relative w-9 h-9 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700">
+                <Link href="/profile" prefetch={true}>
+                  <div 
+                    className="flex items-center cursor-pointer"
+                    onClick={() => {
+                      router.push('/profile');
+                    }}
+                  >
+                    <div 
+                      className="relative w-9 h-9 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700"
+                    >
                       <Image
                         src={getProfileImage() as string}
                         alt="Profil"
@@ -318,9 +325,16 @@ const Navbar: React.FC = () => {
             )}
 
             {session ? (
-              <Link href="/profile">
-                <div className="flex items-center cursor-pointer">
-                  <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700">
+              <Link href="/profile" prefetch={true}>
+                <div 
+                  className="flex items-center cursor-pointer"
+                  onClick={() => {
+                    router.push('/profile');
+                  }}
+                >
+                  <div 
+                    className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700"
+                  >
                     <Image
                       src={getProfileImage() as string}
                       alt="Profil"
