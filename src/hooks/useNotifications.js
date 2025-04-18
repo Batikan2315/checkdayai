@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
-import useSocket from './useSocket';
 
-export default function useNotifications(socket, session) {
+export default function useNotifications() {
   const [bildirimler, setBildirimler] = useState([]);
   const [okunmamışSayısı, setOkunmamışSayısı] = useState(0);
   const [yükleniyor, setYükleniyor] = useState(false);
@@ -12,8 +11,13 @@ export default function useNotifications(socket, session) {
 
   // Bildirimleri sunucudan alma
   const bildirimleriGetir = useCallback(async () => {
-    // Oturum yoksa bildirimler alınmaz
-    if (!session?.user) {
+    // Tarayıcı tarafında olduğunu kontrol et
+    if (typeof window === 'undefined') return;
+    
+    // Sadece oturum açık kullanıcılar için bildirimler alınır
+    // Oturum kontrolü için localStorage token kontrolü yapalım
+    const token = localStorage.getItem('token');
+    if (!token) {
       console.log('Bildirimler için oturum gerekli, istek yapılmıyor');
       return;
     }
@@ -50,7 +54,7 @@ export default function useNotifications(socket, session) {
     } finally {
       setYükleniyor(false);
     }
-  }, [session]);
+  }, []);
 
   // Bildirimleri yenileyen fonksiyon - dışarıdan erişilebilir
   const refreshNotifications = useCallback(async () => {

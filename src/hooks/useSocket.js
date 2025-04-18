@@ -3,12 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 
-// Socket.io modülünü dinamik olarak yükle (sadece tarayıcıda)
-let io;
-if (typeof window !== 'undefined') {
-  io = require('socket.io-client').io;
-}
-
 /**
  * Socket.IO bağlantısını yöneten özel kanca
  * @param {Object} session - Kullanıcı oturumu
@@ -36,16 +30,40 @@ const useSocket = (session) => {
   const bağlantıAktif = useRef(false);
   const zamanlayıcı = useRef(null);
   const başlatıldı = useRef(false);
+  
+  const socketRef = useRef(null);
+  const ioRef = useRef(null);
+
+  // Socket.io modülünü yükleme
+  useEffect(() => {
+    // Sadece tarayıcı tarafında çalıştığından emin ol
+    if (typeof window !== 'undefined' && !ioRef.current) {
+      // Dinamik import
+      import('socket.io-client')
+        .then(module => {
+          ioRef.current = module.io;
+          console.log('Socket.io modülü başarıyla yüklendi');
+        })
+        .catch(error => {
+          console.error('Socket.io modülü yüklenemedi:', error);
+        });
+    }
+  }, []);
 
   // Socket bağlantısını temizleyen yardımcı fonksiyon
   const socketTemizle = useCallback(() => {
-    if (socket) {
+    if (socketRef.current) {
       console.log('Socket bağlantısı temizleniyor...');
-      socket.removeAllListeners();
-      socket.disconnect();
+      try {
+        socketRef.current.removeAllListeners();
+        socketRef.current.disconnect();
+      } catch (e) {
+        console.error('Socket temizleme hatası:', e);
+      }
+      socketRef.current = null;
       setSocket(null);
     }
-  }, [socket]);
+  }, []);
 
   // Manuel olarak bağlantıyı yeniden başlatma
   const yenidenBağlan = useCallback(() => {
@@ -59,8 +77,12 @@ const useSocket = (session) => {
       zamanlayıcı.current = null;
     }
     
-    // Hemen bağlanmayı dene
-    socketBağlantısıKur(session);
+    // ioRef.current varsa bağlanma işlemini başlat
+    if (ioRef.current) {
+      socketBağlantısıKur(session);
+    } else {
+      console.log('Socket.io modülü henüz yüklenmedi, bağlantı kurulamıyor');
+    }
   }, [socketTemizle, session]);
 
   // Socket bağlantısını başlatan fonksiyon
@@ -68,12 +90,23 @@ const useSocket = (session) => {
     if (!başlatıldı.current && session?.user) {
       başlatıldı.current = true;
       bağlantıAktif.current = true;
-      yenidenBağlan();
+      // ioRef.current varsa bağlanma işlemini başlat
+      if (ioRef.current) {
+        yenidenBağlan();
+      } else {
+        console.log('Socket.io modülü henüz yüklenmedi, bağlantı kurulamıyor');
+      }
     }
   }, [yenidenBağlan, session]);
 
   // Socket bağlantısı kurma fonksiyonu
   const socketBağlantısıKur = useCallback((session) => {
+    // Socket.io modülü yüklü değilse çık
+    if (!ioRef.current) {
+      console.log('Socket.io modülü yüklenmedi, bağlantı kurulamıyor');
+      return;
+    }
+    
     if (!session?.user || !bağlantıAktif.current) {
       // Kullanıcı giriş yapmamışsa sessizce çık, hata gösterme
       if (!session?.user) {
@@ -119,7 +152,7 @@ const useSocket = (session) => {
         socketTemizle();
         
         // Yeni bağlantı oluştur
-        const yeniSocket = io(process.env.NEXT_PUBLIC_WEBSOCKET_URL || window.location.origin, {
+        const yeniSocket = ioRef.current(process.env.NEXT_PUBLIC_WEBSOCKET_URL || window.location.origin, {
           withCredentials: true,
           reconnection: false, // Manuel olarak yeniden bağlanma stratejisi kullanılacak
           timeout: 15000, // 15 saniye bağlantı zaman aşımı
@@ -127,7 +160,7 @@ const useSocket = (session) => {
             userId: session?.user?.id || session?.user?._id || null
           },
           transports: ['polling'], // WebSocket hataları nedeniyle sadece polling kullanıyoruz
-          path: '/api/socketio/',
+          path: '/api/socketio',
           forceNew: true,
           autoConnect: true
         });
@@ -194,6 +227,8 @@ const useSocket = (session) => {
           console.error('WebSocket yeniden bağlantı hatası:', error);
         });
         
+        // İki referansı da güncelle
+        socketRef.current = yeniSocket;
         setSocket(yeniSocket);
       } catch (error) {
         console.error('Socket oluşturma hatası:', error);
@@ -211,6 +246,14 @@ const useSocket = (session) => {
       console.log('Çok sık bağlantı denemesi, atlıyorum...');
     }
   }, [socketTemizle, session]);
+  
+  // ioRef değişince başlat
+  useEffect(() => {
+    if (ioRef.current && başlatıldı.current && session?.user) {
+      console.log('Socket.io modülü hazır, bağlantı başlatılıyor');
+      socketBağlantısıKur(session);
+    }
+  }, [ioRef.current, session, socketBağlantısıKur]);
   
   // Ağ bağlantısı değişimlerini izle
   useEffect(() => {
@@ -258,7 +301,7 @@ const useSocket = (session) => {
   useEffect(() => {
     if (session?.user) {
       // Kullanıcı giriş yaptığında ve bağlantı manuel olarak başlatıldığında bağlan
-      if (başlatıldı.current) {
+      if (başlatıldı.current && ioRef.current) {
         bağlantıAktif.current = true;
         if (!socket) {
           socketBağlantısıKur(session);
