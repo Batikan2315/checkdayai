@@ -2,7 +2,13 @@
 const nextConfig = {
   reactStrictMode: false,
   images: {
-    domains: ['res.cloudinary.com', 'checkday.ai', 'lh3.googleusercontent.com'],
+    domains: [
+      'res.cloudinary.com', 
+      'checkday.ai', 
+      'localhost', 
+      'img.checkday.ai',
+      'lh3.googleusercontent.com' // Google profil resimleri için
+    ],
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
     minimumCacheTTL: 3600, // 1 saat
@@ -43,6 +49,8 @@ const nextConfig = {
       net: false,
       tls: false,
       dns: false,
+      child_process: false,
+      aws4: false,
     };
     
     return config;
@@ -54,7 +62,11 @@ const nextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=3600, stale-while-revalidate=86400',
+            value: 'public, max-age=31536000, immutable',
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
           },
         ],
       },
