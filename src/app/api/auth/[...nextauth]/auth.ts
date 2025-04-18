@@ -108,14 +108,10 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ account, profile, user }) {
-      console.log("Sign-in callback triggered", { 
-        provider: account?.provider,
-        profileEmail: profile?.email,
-        profileName: profile?.name,
-        userId: user?.id,
-        accountScope: account?.scope,
-        accountTokenType: account?.token_type
-      });
+      // Detaylı loglama - sorun giderme için
+      console.log("Google profil bilgileri:", JSON.stringify(profile, null, 2));
+      console.log("Google hesap bilgileri:", JSON.stringify(account, null, 2));
+      console.log("Google kullanıcı bilgileri:", JSON.stringify(user, null, 2));
       
       if (account?.provider === "google") {
         if (!profile?.email) {
@@ -129,7 +125,8 @@ export const authOptions: NextAuthOptions = {
           // Google profilinden bilgileri al
           const email = profile?.email;
           const name = profile?.name;
-          const imageUrl = profile?.image;
+          // Resim URL'ini doğru alandan al (picture veya image)
+          const imageUrl = profile?.picture || profile?.image;
           const oauthId = account.providerAccountId;
           
           if (!email) {
@@ -207,6 +204,13 @@ export const authOptions: NextAuthOptions = {
     },
     
     async jwt({ token, user, account }) {
+      // Token oluşturma sürecini detaylı logla
+      console.log("JWT token oluşturma:", { 
+        tokenEmail: token.email, 
+        tokenName: token.name,
+        tokenPicture: token.picture 
+      });
+      
       if (user) {
         token.id = user.id;
         token.role = (user as any).role || "user";
@@ -222,6 +226,8 @@ export const authOptions: NextAuthOptions = {
         const dbUser = await User.findOne({ email: token.email });
         
         if (dbUser) {
+          console.log("Veritabanından kullanıcı bulundu:", { id: dbUser._id, email: dbUser.email });
+          
           token.id = dbUser._id.toString();
           token.role = dbUser.role || "user";
           token.username = dbUser.username;
@@ -229,11 +235,14 @@ export const authOptions: NextAuthOptions = {
           token.firstName = dbUser.firstName;
           token.lastName = dbUser.lastName;
           token.profilePicture = dbUser.profilePicture;
+          token.needsSetup = dbUser.needsSetup;
           
           // Google profil resmi kontrolü - DB'de yoksa Google'dan gelen resmi kullan
           if (!token.profilePicture && token.picture) {
             token.profilePicture = token.picture;
           }
+        } else {
+          console.warn("Kullanıcı veritabanında bulunamadı:", token.email);
         }
       } catch (error) {
         console.error("JWT callback error:", error);
@@ -243,6 +252,13 @@ export const authOptions: NextAuthOptions = {
     },
     
     async session({ session, token }) {
+      console.log("Oturum oluşturma:", { 
+        sessionUserEmail: session.user?.email, 
+        tokenId: token.id,
+        tokenRole: token.role,
+        tokenUsername: token.username
+      });
+      
       if (session.user) {
         // Tüm token bilgilerini session.user'a aktar
         (session.user as any).id = token.id;
@@ -253,6 +269,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).firstName = token.firstName;
         (session.user as any).lastName = token.lastName;
         (session.user as any).profilePicture = token.profilePicture;
+        (session.user as any).needsSetup = token.needsSetup;
         
         // Google profil resmi kontrolü
         if (!session.user.profilePicture && session.user.image) {

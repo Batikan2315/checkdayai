@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: false,
   images: {
-    domains: ['res.cloudinary.com', 'checkday.ai'],
+    domains: ['res.cloudinary.com', 'checkday.ai', 'lh3.googleusercontent.com'],
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
     minimumCacheTTL: 3600, // 1 saat
