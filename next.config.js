@@ -49,6 +49,15 @@ const nextConfig = {
       },
     };
 
+    // İstemci ve sunucu tarafı ayrımı için
+    if (isServer) {
+      // Sunucu taraflı bundle'a girmemesi gereken modüller
+      const ignoreModules = ['socket.io-client'];
+      ignoreModules.forEach(module => {
+        config.externals = [...config.externals, module];
+      });
+    }
+
     return config;
   },
   async headers() {

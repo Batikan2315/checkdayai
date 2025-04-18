@@ -65,6 +65,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   
   // Soketi bağla - OPTİMİZE EDİLDİ VE GÜÇLENDİRİLDİ
   const initSocket = useCallback(() => {
+    // Sunucu tarafında çalışmasını engelle
+    if (typeof window === "undefined") return null;
+    
+    // Önceden bağlantı varsa temizle
+    if (socket && socket.connected) {
+      socket.disconnect();
+    }
+    
     // Eğer kullanıcı oturum açmamışsa bağlantı kurmayı atla
     if (!user || !user._id || loading) {
       cleanupSocket();
@@ -82,9 +90,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     // Mevcut soket varsa kapat
     cleanupSocket();
-    
-    // Tarayıcıda çalışmıyorsa çık
-    if (typeof window === 'undefined') return;
     
     // Yeni bağlantı sayısını göster
     const reconnectCount = reconnectAttempts > 0 ? ` (${reconnectAttempts}. deneme)` : '';
