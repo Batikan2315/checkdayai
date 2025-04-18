@@ -10,6 +10,17 @@ import { toast } from 'react-hot-toast';
  * @returns {Object} Socket ve bağlantı durumu
  */
 const useSocket = (session) => {
+  // Sunucu tarafında çalışıyorsa boş bir sonuç dönüş
+  if (typeof window === 'undefined') {
+    return {
+      socket: null,
+      bağlantıDurumu: 'bağlantı kesildi',
+      bağlantıHatası: null,
+      yenidenBağlan: () => {},
+      başlat: () => {}
+    };
+  }
+  
   const [socket, setSocket] = useState(null);
   const [bağlantıDurumu, setBağlantıDurumu] = useState('bağlantı kesildi');
   const [bağlantıHatası, setBağlantıHatası] = useState(null);

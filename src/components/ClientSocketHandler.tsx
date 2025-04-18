@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import useSocket from '@/hooks/useSocket';
 import useNotifications from '@/hooks/useNotifications';
@@ -13,6 +13,18 @@ import { toast } from 'react-hot-toast';
  */
 export default function ClientSocketHandler() {
   const { data: session, status } = useSession();
+  const [isBrowser, setIsBrowser] = useState(false);
+  
+  useEffect(() => {
+    setIsBrowser(true);
+  }, []);
+  
+  // Bileşen sunucu tarafında işlenirken hiçbir şey yapma
+  if (!isBrowser) {
+    return null;
+  }
+  
+  // Buradan itibaren kod yalnızca tarayıcıda çalışır
   const { 
     socket, 
     bağlantıDurumu, 
@@ -23,7 +35,7 @@ export default function ClientSocketHandler() {
 
   const { 
     refreshNotifications 
-  } = useNotifications(socket, session);
+  } = useNotifications();
 
   // Oturum durumu değiştiğinde socket bağlantısını yönet
   useEffect(() => {
