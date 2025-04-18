@@ -9,7 +9,7 @@ const nextConfig = {
   },
   experimental: {
     scrollRestoration: true,
-    optimizeCss: true,
+    optimizeCss: false,
     optimizeServerReact: false,
   },
   eslint: {
