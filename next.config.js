@@ -52,7 +52,7 @@ const nextConfig = {
     // İstemci ve sunucu tarafı ayrımı için
     if (isServer) {
       // Sunucu taraflı bundle'a girmemesi gereken modüller
-      const tarayiciModulleri = [
+      const browserModules = [
         'socket.io-client', 
         'engine.io-client',
         'engine.io-parser',
@@ -60,26 +60,50 @@ const nextConfig = {
         'debug',
         'sockjs-client',
         'xmlhttprequest-ssl',
-        'engine.io-client',
         'ws',
-        'component-emitter'
+        'component-emitter',
+        'backo2',
+        'parseqs',
+        'isomorphic-ws',
+        'base64-arraybuffer',
+        'yeast',
+        'has-cors',
+        'blob'
       ];
       
-      // Tüm browser modüllerini engelle
+      // external fonksiyonunu güncelleyelim
+      const originalExternals = [...(config.externals || [])];
+      
       config.externals = [
-        ...(config.externals || []),
-        (context, request, callback) => {
-          // Tarayıcı modüllerini kontrol et
-          if (tarayiciModulleri.includes(request)) {
-            // Modülü hariç tut
-            return callback(null, `commonjs ${request}`);
+        ...originalExternals,
+        ({ context, request }, callback) => {
+          // Doğrudan modül isimlerini kontrol et
+          if (browserModules.includes(request)) {
+            return callback(null, 'commonjs ' + request);
           }
           
-          // Aksi takdirde normal işlem
+          // Modül yolu içinde geçen tarayıcı modüllerini kontrol et
+          if (browserModules.some(mod => request.includes(mod))) {
+            return callback(null, 'commonjs ' + request);
+          }
+          
+          // Normal işleme devam et
           callback();
         }
       ];
     }
+
+    // Tüm platformlarda boş modül şablonları ekleyelim
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+      dns: false,
+      "perf_hooks": false,
+      // Tarayıcı özel nesneler için shim ekleyelim
+      "self": false
+    };
 
     return config;
   },
