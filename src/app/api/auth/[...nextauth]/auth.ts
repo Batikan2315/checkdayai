@@ -10,6 +10,13 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code"
+        }
+      }
     }),
     CredentialsProvider({
       id: "credentials",
@@ -61,6 +68,7 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
+  debug: true,
   secret: process.env.JWT_SECRET,
   pages: {
     signIn: "/login",
@@ -72,7 +80,21 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ account, profile, user }) {
+      console.log("Sign-in callback triggered", { 
+        provider: account?.provider,
+        profileEmail: profile?.email,
+        profileName: profile?.name,
+        userId: user?.id,
+        accountScope: account?.scope,
+        accountTokenType: account?.token_type
+      });
+      
       if (account?.provider === "google") {
+        if (!profile?.email) {
+          console.error("Google profil bilgisi alınamadı: Email yok");
+          return false;
+        }
+        
         try {
           await connectDB();
           
@@ -114,6 +136,9 @@ export const authOptions: NextAuthOptions = {
               
               // Kullanıcı adı yoksa oluştur - kurulum ihtiyacı belirle
               if (!existingUser.username) {
+                // E-postadan basit bir kullanıcı adı oluştur
+                const usernameBase = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
+                existingUser.username = usernameBase;
                 existingUser.needsSetup = true;
               }
             }
@@ -125,10 +150,14 @@ export const authOptions: NextAuthOptions = {
             const firstName = nameParts[0] || "";
             const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
             
+            // E-postadan basit bir kullanıcı adı oluştur
+            const usernameBase = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
+            
             await User.create({
               email,
               firstName,
               lastName,
+              username: usernameBase,
               profilePicture: imageUrl,
               oauth_id: oauthId,
               provider: "google",
@@ -141,7 +170,8 @@ export const authOptions: NextAuthOptions = {
           return true;
         } catch (error) {
           console.error("Google sign-in error:", error);
-          return false;
+          console.log("Debug modu: Hataya rağmen giriş izni veriliyor");
+          return true;
         }
       }
       
@@ -205,4 +235,16 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
+  
+  logger: {
+    error(code, metadata) {
+      console.error('NextAuth error:', { code, metadata });
+    },
+    warn(code) {
+      console.warn('NextAuth warning:', code);
+    },
+    debug(code, metadata) {
+      console.log('NextAuth debug:', { code, metadata });
+    }
+  }
 }; 

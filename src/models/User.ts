@@ -40,6 +40,7 @@ export interface IUser extends Document {
   };
   createdAt: Date;
   updatedAt: Date;
+  provider?: 'local' | 'google'; // OAuth kimlik sağlayıcı türü
   oauth_id?: string; // OAuth sağlayıcısından gelen ID
   comparePassword: (password: string) => Promise<boolean>;
   googleProfilePicture?: string;
@@ -86,9 +87,17 @@ const UserSchema = new Schema<IUser>(
     },
     password: {
       type: String,
-      required: [true, 'Şifre zorunludur'],
+      required: function() {
+        // Google ile giriş yapan kullanıcılar için şifre zorunlu değil
+        return this.provider !== 'google';
+      },
       minlength: [6, 'Şifre en az 6 karakter olmalıdır'],
       select: false, // Sorgularda şifreyi dönme
+    },
+    provider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local'
     },
     firstName: {
       type: String,
