@@ -5,6 +5,17 @@ import { connectDB } from "@/lib/db";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
 
+// Google profil tipini genişlet
+interface GoogleProfile {
+  email: string;
+  email_verified: boolean;
+  name: string;
+  picture?: string;  // Google'dan gelen profil resmi
+  image?: string;    // NextAuth'un standart alanı
+  given_name?: string;
+  family_name?: string;
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -122,12 +133,16 @@ export const authOptions: NextAuthOptions = {
         try {
           await connectDB();
           
-          // Google profilinden bilgileri al
-          const email = profile?.email;
-          const name = profile?.name;
-          // Resim URL'ini doğru alandan al (picture veya image)
-          const imageUrl = profile?.picture || profile?.image;
+          // Google profilinden bilgileri al (Tip güvenliği için cast ediyoruz)
+          const googleProfile = profile as GoogleProfile;
+          const email = googleProfile.email;
+          const name = googleProfile.name;
+          // Resim URL'ini doğru alandan al
+          const imageUrl = googleProfile.picture || googleProfile.image;
           const oauthId = account.providerAccountId;
+          
+          // Debug için
+          console.log("İşlenmiş profil bilgileri:", { email, name, imageUrl });
           
           if (!email) {
             return false;
