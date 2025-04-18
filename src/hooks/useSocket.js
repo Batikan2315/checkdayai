@@ -1,8 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { io } from 'socket.io-client';
 import { toast } from 'react-hot-toast';
+
+// Socket.io modülünü dinamik olarak yükle (sadece tarayıcıda)
+let io;
+if (typeof window !== 'undefined') {
+  io = require('socket.io-client').io;
+}
 
 /**
  * Socket.IO bağlantısını yöneten özel kanca
