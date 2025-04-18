@@ -42,14 +42,14 @@ export async function GET(req: NextRequest) {
           origin: corsOrigin,
           methods: ["GET", "POST"],
           credentials: true,
-          allowedHeaders: ['Content-Type', 'Authorization']
+          allowedHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin']
         },
         // WebSocket öncelikli, polling yedek olarak - çift tırnak yerine tek tırnak
-        transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],
         // İstemci ping-pong ve zamanaşımı ayarları (artırıldı)
-        pingTimeout: 30000,      
+        pingTimeout: 60000,      
         pingInterval: 40000,  
-        connectTimeout: 15000,
+        connectTimeout: 60000,
         
         // Performans Optimizasyonları
         perMessageDeflate: {
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
         },
         
         // Bellek Optimizasyonları (daha sıkı)
-        maxHttpBufferSize: 500 * 1024, // 500KB maksimum mesaj boyutu
+        maxHttpBufferSize: 1000 * 1024, // 1MB maksimum mesaj boyutu
         httpCompression: true,
         
         // Cookie Optimizasyonu - COOKIE BOYUTU İÇİN KRİTİK
@@ -68,12 +68,12 @@ export async function GET(req: NextRequest) {
           httpOnly: true,
           sameSite: "lax", // "strict" yerine "lax" kullanıyoruz - daha iyi destek
           secure: isProd,
-          maxAge: 86400, // 24 saat (saniyeler) - 12 saat yerine
+          maxAge: 86400 * 7, // 7 gün (saniyeler)
         },
         
         // Otomatik düzeltmeler ve cache busting için
         cleanupEmptyChildNamespaces: true,
-        path: '/api/socketio/'
+        path: '/api/socketio'
       });
       
       io.on("connection", (socket) => {

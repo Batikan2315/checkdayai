@@ -97,20 +97,26 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       // Socket.IO client yapılandırması - GÜÇLENDİRİLDİ
       const newSocket = io(SOCKET_URL, {
-        path: '/api/socketio/',
-        // WebSocket hataları nedeniyle sadece polling kullanıyoruz
-        transports: ['polling'],
+        path: '/api/socketio',
+        // WebSocket hataları nedeniyle polling kullanıyoruz, sonra WebSocket'e geçeceğiz
+        transports: ['polling', 'websocket'],
         // Bağlantı ayarları - daha kararlı zaman aşımları
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 30000,
+        reconnectionAttempts: 10,      // Daha fazla deneme
+        reconnectionDelay: 1000,       // 1 saniye bekleme
+        reconnectionDelayMax: 10000,   // En fazla 10 saniye bekleme
+        timeout: 60000,                // 60 saniye zaman aşımı
         // Bellek optimizasyonları
         autoConnect: true,
         forceNew: true,
+        withCredentials: true,         // CORS için önemli
         // Kimlik doğrulama
         auth: {
           userId: user._id
+        },
+        // CORS ayarları
+        extraHeaders: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Credentials": "true"
         }
       });
       
