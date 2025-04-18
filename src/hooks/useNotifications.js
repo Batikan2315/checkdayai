@@ -1,168 +1,82 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+import { toast } from 'react-hot-toast';
 import useSocket from './useSocket';
 
-export default function useNotifications() {
-  const { data: session } = useSession();
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [activeType, setActiveType] = useState(null);
-  const { socket, bağlantıDurumu } = useSocket();
-  
-  // Bildirimleri API'den getiren fonksiyon
-  const fetchNotifications = useCallback(async ({ force = false } = {}) => {
-    // Oturum yoksa çıkış yap
-    if (!session?.user?.id) {
-      console.log("Kullanıcı giriş yapmadı, API isteği engelleniyor");
-      return;
-    }
+export default function useNotifications(socket, session) {
+  const [bildirimler, setBildirimler] = useState([]);
+  const [okunmamışSayısı, setOkunmamışSayısı] = useState(0);
+  const [yükleniyor, setYükleniyor] = useState(false);
+  const [hata, setHata] = useState(null);
+
+  // Bildirimleri sunucudan alma
+  const bildirimleriGetir = useCallback(async () => {
+    // Oturum yoksa bildirimler alınmaz
+    if (!session?.user) return;
     
-    // Son istek kontrolü (3 dakika)
-    const lastFetch = localStorage.getItem('lastNotificationFetch');
-    const now = Date.now();
-    
-    if (lastFetch && !force && (now - parseInt(lastFetch) < 3 * 60 * 1000)) {
-      console.log("Son istekten beri 3 dakikadan az zaman geçti, istek engelleniyor");
-      return;
-    }
+    setYükleniyor(true);
+    setHata(null);
     
     try {
-      setLoading(true);
-      console.log("İlk yükleme bildirimleri getiriliyor");
-      
-      // API isteği
       const response = await fetch('/api/notifications');
       
       if (!response.ok) {
-        throw new Error('API yanıtı alınamadı');
+        throw new Error(`Bildirimler alınamadı: ${response.status}`);
       }
       
       const data = await response.json();
       
-      // Bildirimleri kaydet
-      setNotifications(data);
-      
-      // Okunmamış sayısını hesapla
-      const unread = data.filter(n => !n.read).length;
-      setUnreadCount(unread);
-      
-      // Son istek zamanını kaydet
-      localStorage.setItem('lastNotificationFetch', now.toString());
-    } catch (error) {
-      console.error("Bildirimler alınamadı:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [session]);
-  
-  // WebSocket ile yeni bildirimleri alma
-  useEffect(() => {
-    if (!socket || !bağlantıDurumu || !session?.user?.id) return;
-    
-    // Yeni bildirim geldiğinde
-    const handleNewNotification = (newNotification) => {
-      console.log("Yeni bildirim alındı:", newNotification);
-      setNotifications(prev => [newNotification, ...prev]);
-      setUnreadCount(prev => prev + 1);
-    };
-    
-    // Bildirim silindiğinde
-    const handleDeletedNotification = (notificationId) => {
-      console.log("Bildirim silindi:", notificationId);
-      setNotifications(prev => {
-        const notification = prev.find(n => n._id === notificationId);
-        const isUnread = notification && !notification.read;
-        
-        // Bildirim sayısını güncelle
-        if (isUnread) {
-          setUnreadCount(count => Math.max(0, count - 1));
-        }
-        
-        return prev.filter(n => n._id !== notificationId);
-      });
-    };
-    
-    // Okunma durumu güncellendiğinde
-    const handleReadStatusChange = (data) => {
-      console.log("Bildirim okunma durumu değişti:", data);
-      
-      if (data.allRead) {
-        // Tümü okundu
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-        setUnreadCount(0);
-      } else if (data.notificationId) {
-        // Tek bildirim okundu
-        setNotifications(prev => prev.map(n => 
-          n._id === data.notificationId ? { ...n, read: true } : n
-        ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+      if (Array.isArray(data)) {
+        setBildirimler(data);
+        const okunmamışlar = data.filter(bildirim => !bildirim.okundu).length;
+        setOkunmamışSayısı(okunmamışlar);
+      } else {
+        throw new Error('Geçersiz bildirim verisi');
       }
-    };
-    
-    // Socket olaylarını dinle
-    socket.on('new_notification', handleNewNotification);
-    socket.on('notification_deleted', handleDeletedNotification);
-    socket.on('notification_read', handleReadStatusChange);
-    
-    // İlk bildirimleri getir
-    fetchNotifications();
-    
-    // Temizlik
-    return () => {
-      socket.off('new_notification', handleNewNotification);
-      socket.off('notification_deleted', handleDeletedNotification);
-      socket.off('notification_read', handleReadStatusChange);
-    };
-  }, [socket, bağlantıDurumu, session, fetchNotifications]);
-  
-  // Önceki kullanıcıdan kalan bildirimleri temizle
-  useEffect(() => {
-    if (!session?.user) {
-      setNotifications([]);
-      setUnreadCount(0);
+    } catch (error) {
+      console.error('Bildirimler alınamadı:', error);
+      setHata(error.message);
+    } finally {
+      setYükleniyor(false);
     }
   }, [session]);
-  
-  // İlk yüklemede bildirimleri getir
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchNotifications();
-    }
-  }, [session, fetchNotifications]);
-  
-  // Bildirimi okundu olarak işaretle
-  const markAsRead = async (notificationId) => {
-    if (!session?.user?.id) return;
+
+  // Bildirimi okundu olarak işaretleme
+  const bildirimOkunduİşaretle = useCallback(async (bildirimId) => {
+    if (!session?.user || !bildirimId) return;
     
     try {
-      const response = await fetch(`/api/notifications?id=${notificationId}`, {
+      const response = await fetch(`/api/notifications/${bildirimId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ read: true }),
+        body: JSON.stringify({ okundu: true }),
       });
       
       if (!response.ok) {
-        throw new Error('API yanıtı alınamadı');
+        throw new Error(`Bildirim güncellenemedi: ${response.status}`);
       }
       
-      // UI güncelle
-      setNotifications(prev => prev.map(n => 
-        n._id === notificationId ? { ...n, read: true } : n
-      ));
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      // Bildirimler listesini güncelle
+      setBildirimler(öncekiBildirimler =>
+        öncekiBildirimler.map(bildirim =>
+          bildirim._id === bildirimId ? { ...bildirim, okundu: true } : bildirim
+        )
+      );
+      
+      // Okunmamış bildirim sayısını güncelle
+      setOkunmamışSayısı(öncekiSayı => Math.max(0, öncekiSayı - 1));
     } catch (error) {
-      console.error("Bildirim okundu işaretlenirken hata:", error);
+      console.error('Bildirim okundu işaretlenirken hata:', error);
+      toast.error('Bildirim güncellenemedi');
     }
-  };
-  
-  // Tüm bildirimleri okundu olarak işaretle
-  const markAllAsRead = async () => {
-    if (!session?.user?.id) return;
+  }, [session]);
+
+  // Tüm bildirimleri okundu olarak işaretleme
+  const tümBildirimleriOkunduYap = useCallback(async () => {
+    if (!session?.user || bildirimler.length === 0) return;
     
     try {
       const response = await fetch('/api/notifications/read-all', {
@@ -173,104 +87,157 @@ export default function useNotifications() {
       });
       
       if (!response.ok) {
-        throw new Error('API yanıtı alınamadı');
+        throw new Error(`Bildirimler güncellenemedi: ${response.status}`);
       }
       
-      // UI güncelle
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
+      // Tüm bildirimleri okundu olarak işaretle
+      setBildirimler(öncekiBildirimler =>
+        öncekiBildirimler.map(bildirim => ({ ...bildirim, okundu: true }))
+      );
+      
+      // Okunmamış sayısını sıfırla
+      setOkunmamışSayısı(0);
     } catch (error) {
-      console.error("Tüm bildirimler okundu işaretlenirken hata:", error);
+      console.error('Tüm bildirimler okundu yapılırken hata:', error);
+      toast.error('Bildirimler güncellenemedi');
     }
-  };
-  
-  // Bildirimi sil
-  const deleteNotification = async (notificationId) => {
-    if (!session?.user?.id) return;
+  }, [session, bildirimler]);
+
+  // Bildirimi silme
+  const bildirimSil = useCallback(async (bildirimId) => {
+    if (!session?.user || !bildirimId) return;
     
     try {
-      const response = await fetch(`/api/notifications?id=${notificationId}`, {
+      const response = await fetch(`/api/notifications/${bildirimId}`, {
         method: 'DELETE',
       });
       
       if (!response.ok) {
-        throw new Error('API yanıtı alınamadı');
+        throw new Error(`Bildirim silinemedi: ${response.status}`);
       }
       
-      // UI güncelle
-      setNotifications(prev => {
-        const notification = prev.find(n => n._id === notificationId);
-        const isUnread = notification && !notification.read;
-        
-        // Bildirim sayısını güncelle
-        if (isUnread) {
-          setUnreadCount(count => Math.max(0, count - 1));
-        }
-        
-        return prev.filter(n => n._id !== notificationId);
-      });
+      // Bildirim listesinden kaldır
+      setBildirimler(öncekiBildirimler => 
+        öncekiBildirimler.filter(bildirim => bildirim._id !== bildirimId)
+      );
+      
+      // Okunmamış sayısını güncelle (eğer silinen bildirim okunmamışsa)
+      const silinenBildirim = bildirimler.find(b => b._id === bildirimId);
+      if (silinenBildirim && !silinenBildirim.okundu) {
+        setOkunmamışSayısı(öncekiSayı => Math.max(0, öncekiSayı - 1));
+      }
     } catch (error) {
-      console.error("Bildirim silinirken hata:", error);
+      console.error('Bildirim silinirken hata:', error);
+      toast.error('Bildirim silinemedi');
     }
-  };
-  
-  // Tüm bildirimleri veya belirli tipteki tüm bildirimleri sil
-  const deleteAllNotifications = async (type = null) => {
-    if (!session?.user?.id) return;
+  }, [session, bildirimler]);
+
+  // Socket.IO üzerinden yeni bildirim dinleme
+  useEffect(() => {
+    if (!socket || !session?.user) return;
     
-    try {
-      const endpoint = type 
-        ? `/api/notifications/delete-by-type?type=${type}` 
-        : '/api/notifications/delete-all';
+    // Sayfa yüklendiğinde bildirimleri al
+    bildirimleriGetir();
+    
+    // Yeni bildirim geldiğinde
+    const yeniBildirimHandler = (yeniBildirim) => {
+      console.log('Yeni bildirim alındı:', yeniBildirim);
       
-      const response = await fetch(endpoint, {
-        method: 'DELETE',
+      if (!yeniBildirim || !yeniBildirim._id) {
+        console.error('Geçersiz bildirim formatı:', yeniBildirim);
+        return;
+      }
+      
+      // Bildirimi listeye ekle
+      setBildirimler(öncekiBildirimler => {
+        // Eğer bildirim zaten varsa tekrar ekleme
+        const bildirimVarMı = öncekiBildirimler.some(b => b._id === yeniBildirim._id);
+        if (bildirimVarMı) return öncekiBildirimler;
+        
+        // Yeni bildirimi başa ekle
+        return [yeniBildirim, ...öncekiBildirimler];
       });
       
-      if (!response.ok) {
-        throw new Error('API yanıtı alınamadı');
-      }
+      // Okunmamış sayısını güncelle
+      setOkunmamışSayısı(öncekiSayı => öncekiSayı + 1);
       
-      // UI güncelle
-      if (type) {
-        setNotifications(prev => {
-          const newNotifications = prev.filter(n => n.type !== type);
-          
-          // Okunmamış bildirimleri yeniden hesapla
-          const unread = newNotifications.filter(n => !n.read).length;
-          setUnreadCount(unread);
-          
-          return newNotifications;
-        });
-      } else {
-        setNotifications([]);
-        setUnreadCount(0);
+      // Bildirim göster
+      toast.custom((t) => (
+        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} 
+                        max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto 
+                        flex ring-1 ring-black ring-opacity-5 p-2 border-l-4 border-blue-500`}>
+          <div className="flex-1 w-0 p-2">
+            <div className="flex items-start">
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-gray-900">
+                  {yeniBildirim.başlık || 'Yeni Bildirim'}
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {yeniBildirim.mesaj}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex border-l border-gray-200">
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="w-full border border-transparent rounded-none rounded-r-lg p-2 flex items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none"
+            >
+              Kapat
+            </button>
+          </div>
+        </div>
+      ), { duration: 5000 });
+    };
+    
+    // Bildirim silindi olayını dinle
+    const bildirimSilindiHandler = (silinen) => {
+      if (!silinen || !silinen.bildirimId) return;
+      
+      // Bildirim listesinden kaldır
+      setBildirimler(öncekiBildirimler => 
+        öncekiBildirimler.filter(b => b._id !== silinen.bildirimId)
+      );
+      
+      // Eğer okunmamış bir bildirim silindiyse, sayıyı güncelle
+      const silinenBildirim = bildirimler.find(b => b._id === silinen.bildirimId);
+      if (silinenBildirim && !silinenBildirim.okundu) {
+        setOkunmamışSayısı(öncekiSayı => Math.max(0, öncekiSayı - 1));
       }
-    } catch (error) {
-      console.error("Bildirimler silinirken hata:", error);
+    };
+    
+    // Olay dinleyicilerini ekle
+    socket.on('yeni-bildirim', yeniBildirimHandler);
+    socket.on('bildirim-silindi', bildirimSilindiHandler);
+    
+    // Temizleme işlevi
+    return () => {
+      socket.off('yeni-bildirim', yeniBildirimHandler);
+      socket.off('bildirim-silindi', bildirimSilindiHandler);
+    };
+  }, [socket, session, bildirimleriGetir, bildirimler]);
+  
+  // Bağlantı durumu değiştiğinde bildirimleri güncelle
+  useEffect(() => {
+    if (socket && socket.connected && session?.user) {
+      bildirimleriGetir();
     }
-  };
-  
-  // Bildirimleri tipe göre filtrele
-  const filterByType = (type) => {
-    setActiveType(type);
-  };
-  
-  // Filtrelenmiş bildirimleri döndür
-  const filteredNotifications = activeType
-    ? notifications.filter(n => n.type === activeType)
-    : notifications;
-  
+  }, [socket, session, bildirimleriGetir]);
+
   return {
-    notifications: filteredNotifications,
-    unreadCount,
-    loading,
-    markAsRead,
-    markAllAsRead,
-    deleteNotification,
-    deleteAllNotifications,
-    fetchNotifications,
-    filterByType,
-    activeType,
+    bildirimler,
+    okunmamışSayısı,
+    yükleniyor,
+    hata,
+    bildirimleriGetir,
+    bildirimOkunduİşaretle,
+    tümBildirimleriOkunduYap,
+    bildirimSil,
+    
+    // Tip filtreleme yardımcıları
+    sistemBildirimleri: bildirimler.filter(b => b.tip === 'sistem'),
+    planBildirimleri: bildirimler.filter(b => b.tip === 'plan'),
+    mesajBildirimleri: bildirimler.filter(b => b.tip === 'mesaj'),
+    arkadaşlıkBildirimleri: bildirimler.filter(b => b.tip === 'arkadaşlık'),
   };
 } 

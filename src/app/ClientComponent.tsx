@@ -48,10 +48,14 @@ export default function ClientComponent() {
       
       // İstatistik gönderme 
       try {
-        fetch('/api/analytics/pageview', {
+        // Yerel API yerine, tam URL kullanarak gönder
+        fetch(`${window.location.origin}/api/analytics/pageview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url, path: pathname })
+        }).catch(err => {
+          // Sessizce hatayı yoksay, kullanıcı deneyimini etkilemesin
+          console.log("Analitik gönderimi başarısız oldu, devam ediliyor");
         });
       } catch (error) {
         console.error("Analitik verisi gönderilemedi", error);

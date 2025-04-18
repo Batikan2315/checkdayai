@@ -96,8 +96,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Socket.IO client yapılandırması - GÜÇLENDİRİLDİ
       const newSocket = io(SOCKET_URL, {
         path: '/api/socketio/',
-        // Önce WebSocket dene, olmuyorsa polling'e düş
-        transports: pollingMode ? ['polling'] : ['websocket', 'polling'],
+        // WebSocket hataları nedeniyle sadece polling kullanıyoruz
+        transports: ['polling'],
         // Bağlantı ayarları - daha kararlı zaman aşımları
         reconnectionAttempts: 3,
         reconnectionDelay: 2000,
@@ -106,8 +106,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // Bellek optimizasyonları
         autoConnect: true,
         forceNew: true,
-        // WebSocket bağlantısını hatırlama
-        rememberUpgrade: true,
         // Kimlik doğrulama
         auth: {
           userId: user._id
