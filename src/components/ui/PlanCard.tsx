@@ -1,12 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { FaCalendarAlt, FaMapMarkerAlt, FaHeart, FaRegHeart, FaBookmark, FaRegBookmark, FaUsers, FaImage } from "react-icons/fa";
+import { FaCalendarAlt, FaMapMarkerAlt, FaHeart, FaRegHeart, FaBookmark, FaRegBookmark, FaUsers, FaImage, FaUser } from "react-icons/fa";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { toast } from "react-hot-toast";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
+import { format } from "date-fns";
+import { tr } from "date-fns/locale";
+
+import { likePlan, savePlan } from "@/services/planService";
 
 interface CreatorInfo {
   _id?: string;
@@ -41,6 +46,8 @@ interface PlanCardProps {
   onJoin?: (id: string) => void;
   isJoined?: boolean;
   showActions?: boolean;
+  plan: any;
+  refreshPlans?: () => void;
 }
 
 const PlanCard = ({
@@ -64,6 +71,8 @@ const PlanCard = ({
   onJoin,
   isJoined = false,
   showActions = true,
+  plan,
+  refreshPlans,
 }: PlanCardProps) => {
   // Görüntü hatası durumunu izleme
   const [imgError, setImgError] = useState(false);
@@ -258,24 +267,7 @@ const PlanCard = ({
       setUserLiked(!userLiked);
       setLikeCount(prev => userLiked ? prev - 1 : prev + 1);
       
-      const response = await fetch(`/api/plans/${id}/like`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          action: userLiked ? 'unlike' : 'like'
-        }),
-      });
-      
-      if (!response.ok) {
-        // Hata durumunda geri al
-        setUserLiked(!userLiked);
-        setLikeCount(prev => userLiked ? prev + 1 : prev - 1);
-        const error = await response.json();
-        throw new Error(error.error || "İşlem sırasında bir hata oluştu");
-      }
+      await likePlan(id);
       
       if (onLike) onLike(id);
       
@@ -301,24 +293,7 @@ const PlanCard = ({
       setUserSaved(!userSaved);
       setSaveCount(prev => userSaved ? prev - 1 : prev + 1);
       
-      const response = await fetch(`/api/plans/${id}/save`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          action: userSaved ? 'unsave' : 'save'
-        }),
-      });
-      
-      if (!response.ok) {
-        // Hata durumunda geri al
-        setUserSaved(!userSaved);
-        setSaveCount(prev => userSaved ? prev + 1 : prev - 1);
-        const error = await response.json();
-        throw new Error(error.error || "İşlem sırasında bir hata oluştu");
-      }
+      await savePlan(id);
       
       if (onSave) onSave(id);
       
@@ -358,160 +333,130 @@ const PlanCard = ({
     return getCreatorImage(creator);
   };
 
+  // Özel tarih formatı
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return format(date, "d MMMM", { locale: tr });
+    } catch (error) {
+      return "Tarih bilgisi yok";
+    }
+  };
+
+  // Saat formatı
+  const formatTime = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return format(date, "HH:mm", { locale: tr });
+    } catch (error) {
+      return "--:--";
+    }
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer">
-      <div onClick={handleClickDetails} className="relative">
-        {/* Plan Resmi */}
-        <div className="relative h-48 w-full overflow-hidden bg-gray-100">
-          {imageUrl && !imgError ? (
-            <Image 
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden transition-all hover:shadow-lg">
+      <Link href={`/plan/${id}`}>
+        <div className="relative h-40 w-full">
+          {(!imageUrl || imgError) ? (
+            <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700">
+              <span className="text-gray-400 dark:text-gray-500 text-lg">Görsel yok</span>
+            </div>
+          ) : (
+            <Image
               src={imageUrl}
               alt={title}
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              priority
-              className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
+              layout="fill"
+              objectFit="cover"
               onError={handleImageError}
+              className="w-full h-full object-cover"
             />
-          ) : (
-            <div className="flex items-center justify-center h-full w-full bg-gradient-to-r from-blue-50 to-indigo-50">
-              <FaImage className="h-16 w-16 text-gray-300" aria-hidden="true" />
-            </div>
           )}
-          
-          {/* Kategoriler ve Fiyat - Resim üzerinde */}
-          <div className="absolute bottom-0 right-0 left-0 flex justify-between items-center p-2 bg-gradient-to-t from-gray-900/70 to-transparent">
-            <div className="flex gap-1">
-              {isOnline && (
-                <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
-                  Online
-                </span>
-              )}
-              {maxParticipants && (
-                <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-0.5 rounded flex items-center">
-                  <FaUsers className="mr-1 text-xs" aria-hidden="true" />
-                  <span>{participantCount}/{maxParticipants}</span>
-                </span>
-              )}
-            </div>
-            <div>
-              {isFree ? (
-                <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded">
-                  Ücretsiz
-                </span>
-              ) : (
-                <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded">
-                  {formatCurrency(price)}
-                </span>
-              )}
-            </div>
-          </div>
         </div>
-      
-        <div className="p-4">
-          <div className="flex justify-between items-start mb-2">
-            <div 
-              className="flex items-center gap-2" 
-              onClick={(e) => {
-                e.stopPropagation();
-                if (creator?.username) {
-                  router.push(`/@${creator.username}`);
-                }
-              }}
-            >
-              <div className="relative w-8 h-8 rounded-full overflow-hidden border border-gray-300">
+      </Link>
+
+      <div className="p-4">
+        <div className="flex items-center mb-3">
+          {/* Plan Oluşturan Bilgisi */}
+          {creator && (
+            <div className="flex items-center mr-auto">
+              <div className="relative w-8 h-8 overflow-hidden rounded-full mr-2">
                 <Image
                   src={getAvatarUrl()}
                   alt={creatorName}
-                  fill
-                  sizes="32px"
-                  className="object-cover"
+                  layout="fill"
+                  objectFit="cover"
+                  className="rounded-full"
                   onError={handleAvatarError}
-                  priority
                 />
               </div>
-              <div>
-                <p className="font-medium text-sm text-gray-900">{creatorName}</p>
-                {creatorUsername && (
-                  <span 
-                    className="text-xs text-gray-500 hover:text-blue-500 hover:underline cursor-pointer" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (creator?.username) {
-                        router.push(`/@${creator.username}`);
-                      }
-                    }}
-                  >
-                    {creatorUsername}
-                  </span>
-                )}
-              </div>
+              <Link href={`/${creator.username}`} className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                {creatorName}
+              </Link>
             </div>
-            {isOwner && (
-              <span className="ml-auto bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">
-                Creator
-              </span>
-            )}
-          </div>
-
-          <h3 className="font-bold text-xl mb-2 text-gray-900 line-clamp-2">{title}</h3>
-          <p className="text-gray-700 mb-4 text-sm line-clamp-2">{description}</p>
-
-          <div className="flex items-center justify-between text-gray-500 text-sm">
-            <div className="flex items-center gap-1">
-              <FaCalendarAlt className="text-blue-500" aria-hidden="true" />
-              <span>
-                {formatDate(date.toISOString())} • {date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <FaMapMarkerAlt className="text-green-500" aria-hidden="true" />
-              <span className="truncate max-w-[120px]">{isOnline ? "Online Plan" : location}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {showActions && (
-        <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <button 
-                onClick={handleLike}
-                disabled={liking}
-                className="flex items-center text-gray-500 hover:text-red-500 transition-colors"
-                aria-label={userLiked ? "Beğeniyi kaldır" : "Beğen"}
-                aria-pressed={userLiked}
-              >
-                {userLiked ? <FaHeart className="text-red-500" aria-hidden="true" /> : <FaRegHeart aria-hidden="true" />}
-                <span className="ml-1 text-xs">{likeCount > 0 ? likeCount : ''}</span>
-              </button>
-              <button 
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center text-gray-500 hover:text-blue-500 transition-colors"
-                aria-label={userSaved ? "Kaydetmeyi kaldır" : "Kaydet"}
-                aria-pressed={userSaved}
-              >
-                {userSaved ? <FaBookmark className="text-blue-500" aria-hidden="true" /> : <FaRegBookmark aria-hidden="true" />}
-                <span className="ml-1 text-xs">{saveCount > 0 ? saveCount : ''}</span>
-              </button>
-            </div>
-            <button
-              onClick={handleJoin}
-              disabled={joining}
-              className={`py-1 px-3 rounded-full text-sm font-medium transition-colors ${
-                isJoined || isOwner 
-                  ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-              }`}
-              aria-label={isJoined || isOwner ? "Plana Git" : "Katıl"}
+          )}
+          
+          <div className="flex space-x-2">
+            <button 
+              onClick={handleLike} 
+              className="flex items-center space-x-1 text-gray-600 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-500"
             >
-              {joining ? 'Katılıyor...' : isJoined || isOwner ? 'Plana Git' : 'Katıl'}
+              {userLiked ? (
+                <FaHeart className="text-red-500" />
+              ) : (
+                <FaRegHeart />
+              )}
+              <span className="text-xs">{likeCount > 0 ? likeCount : ''}</span>
+            </button>
+            
+            <button
+              onClick={handleSave}
+              className="flex items-center space-x-1 text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-500"
+            >
+              {userSaved ? (
+                <FaBookmark className="text-blue-500" />
+              ) : (
+                <FaRegBookmark />
+              )}
             </button>
           </div>
         </div>
-      )}
+
+        <Link href={`/plan/${id}`}>
+          <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            {title}
+          </h3>
+        </Link>
+
+        <div className="flex flex-wrap gap-2 mb-3">
+          <div className="flex items-center text-gray-600 dark:text-gray-300 text-sm">
+            <FaCalendarAlt className="mr-1 text-xs" />
+            <span>{formatDate(date.toISOString())} · {formatTime(date.toISOString())}</span>
+          </div>
+          
+          {location && (
+            <div className="flex items-center text-gray-600 dark:text-gray-300 text-sm">
+              <FaMapMarkerAlt className="mr-1 text-xs" />
+              <span>{isOnline ? "Online Plan" : location}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center">
+            <FaUsers className="text-gray-500 dark:text-gray-400 mr-1 text-sm" />
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {participantCount}/{maxParticipants} katılımcı
+            </span>
+          </div>
+          
+          <Link
+            href={`/plan/${id}`}
+            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Detaylar
+          </Link>
+        </div>
+      </div>
     </div>
   );
 };

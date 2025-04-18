@@ -308,6 +308,7 @@ export default function UserProfile() {
                 participantCount={plan.participants?.length || 0}
                 likes={plan.likes?.length || 0}
                 saves={plan.saves?.length || 0}
+                plan={plan}
               />
             ))}
           </div>

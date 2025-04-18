@@ -50,6 +50,14 @@ interface PlanData {
   isPublic: boolean; // Herkese açık planlar için yeni alan 
   allowInvites: boolean;
   creator: string;
+  creatorInfo: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+    profilePicture: string;
+    email: string;
+  };
   cancellationPolicy?: string;
   imageUrl?: string;
 }
@@ -326,6 +334,16 @@ export default function CreatePlan() {
         }
       }
       
+      // Creator bilgilerini ekle - API'de populate doğru çalışsın diye
+      const creatorInfo = {
+        _id: userId,
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        username: user.username || "",
+        profilePicture: user.profilePicture || user.image || "",
+        email: user.email || ""
+      };
+      
       // API isteği için veri yapısını hazırla
       const planData: PlanData = {
         title: formData.title,
@@ -341,6 +359,7 @@ export default function CreatePlan() {
         isPublic: !formData.isPrivate, // Herkese açık planlar
         allowInvites: true,
         creator: userId,
+        creatorInfo: creatorInfo, // Creator bilgilerini ekle
       };
       
       // Yüklenen görüntü varsa ekle

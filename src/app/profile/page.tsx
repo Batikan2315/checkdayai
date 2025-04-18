@@ -22,7 +22,7 @@ const formatCreator = (creator: any) => {
   if (!creator) return undefined;
   
   return {
-    _id: creator._id?.toString(),
+    _id: creator._id?.toString?.() || creator?.id,
     username: creator.username,
     firstName: creator.firstName,
     lastName: creator.lastName,
@@ -670,16 +670,17 @@ export default function Profile() {
               id={plan._id?.toString() || ''}
               title={plan.title || ''}
               description={plan.description || ''}
-              date={new Date(plan.startDate || Date.now())}
-              location={plan.location || (plan.isOnline ? 'Online' : 'Belirtilmemiş')}
+              date={new Date(plan.startDate)}
+              location={plan.location || ''}
               imageUrl={plan.imageUrl}
-              creator={plan.creator ? formatCreator(plan.creator) : formatCreator(user)}
+              creator={formatCreator(plan.creator)}
               isOnline={plan.isOnline}
               isFree={plan.isFree}
-              price={plan.price || 0}
-              maxParticipants={plan.maxParticipants || 0}
+              price={plan.price}
+              maxParticipants={plan.maxParticipants}
               participantCount={plan.participants?.length || 0}
               isJoined={plan.participants?.some(p => p.toString() === user._id.toString())}
+              plan={plan}
             />
           ))}
         </div>
@@ -704,16 +705,17 @@ export default function Profile() {
               id={plan._id?.toString() || ''}
               title={plan.title || ''}
               description={plan.description || ''}
-              date={new Date(plan.startDate || Date.now())}
-              location={plan.location || (plan.isOnline ? 'Online' : 'Belirtilmemiş')}
+              date={new Date(plan.startDate)}
+              location={plan.location || ''}
               imageUrl={plan.imageUrl}
               creator={formatCreator(plan.creator)}
               isOnline={plan.isOnline}
               isFree={plan.isFree}
-              price={plan.price || 0}
-              maxParticipants={plan.maxParticipants || 0}
+              price={plan.price}
+              maxParticipants={plan.maxParticipants}
               participantCount={plan.participants?.length || 0}
               isJoined={plan.participants?.some(p => p.toString() === user._id.toString())}
+              plan={plan}
             />
           ))}
         </div>
@@ -738,16 +740,17 @@ export default function Profile() {
               id={plan._id?.toString() || ''}
               title={plan.title || ''}
               description={plan.description || ''}
-              date={new Date(plan.startDate || Date.now())}
-              location={plan.location || (plan.isOnline ? 'Online' : 'Belirtilmemiş')}
+              date={new Date(plan.startDate)}
+              location={plan.location || ''}
               imageUrl={plan.imageUrl}
               creator={formatCreator(plan.creator)}
               isOnline={plan.isOnline}
               isFree={plan.isFree}
-              price={plan.price || 0}
-              maxParticipants={plan.maxParticipants || 0}
+              price={plan.price}
+              maxParticipants={plan.maxParticipants}
               participantCount={plan.participants?.length || 0}
               isJoined={plan.participants?.some(p => p.toString() === user._id.toString())}
+              plan={plan}
             />
           ))}
         </div>
@@ -890,7 +893,7 @@ export default function Profile() {
       {needsSetup ? (
         <WelcomeSetup onComplete={handleSetupComplete} />
       ) : (
-        <PageContainer>
+        <PageContainer className="profile-page">
           <div className="flex flex-col md:flex-row gap-6">
             {/* Sol menü */}
             <div className="w-full md:w-64 md:min-w-64 md:max-h-[calc(100vh-16rem)] sticky top-24">

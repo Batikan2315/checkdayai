@@ -20,24 +20,32 @@ export async function GET(req: NextRequest) {
     // İstek origin bilgisini al
     const origin = req.headers.get('origin') || '*';
     const isProd = process.env.NODE_ENV === 'production';
+
+    // İzin verilen originler
+    const allowedOrigins = [
+      "https://checkday.ai", 
+      "https://www.checkday.ai",
+      "http://localhost:3000"
+    ];
+    
+    // Gelen istek izin verilen origin mi kontrol et
+    const corsOrigin = isProd 
+      ? allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
+      : "*";
     
     if (!io) {
       // Eğer io yoksa yeni bir instance oluştur
       
-      // Socket.IO yapılandırması - ÖLÇEKLENME İÇİN OPTİMİZE EDİLDİ
+      // Socket.IO yapılandırması - ÖLÇEKLENME VE PERFORMANS İÇİN OPTİMİZE EDİLDİ
       io = new SocketIOServer({
         cors: {
-          origin: isProd ? [
-            "https://checkday.ai", 
-            "https://www.checkday.ai",
-            "http://localhost:3000"
-          ] : "*",
+          origin: corsOrigin,
           methods: ["GET", "POST"],
           credentials: true,
           allowedHeaders: ['Content-Type', 'Authorization']
         },
-        // Polling öncelikli, WebSocket'e yükseltme var, ama polling aralığını artırdık
-        transports: ['polling', 'websocket'],
+        // WebSocket öncelikli, polling yedek olarak - çift tırnak yerine tek tırnak
+        transports: ['websocket', 'polling'],
         // İstemci ping-pong ve zamanaşımı ayarları (artırıldı)
         pingTimeout: 30000,      
         pingInterval: 40000,  
@@ -58,9 +66,9 @@ export async function GET(req: NextRequest) {
           name: "io",
           path: "/",
           httpOnly: true,
-          sameSite: "strict", // "lax" yerine "strict" kullanıyoruz
+          sameSite: "lax", // "strict" yerine "lax" kullanıyoruz - daha iyi destek
           secure: isProd,
-          maxAge: 43200, // 12 saat (saniyeler) - 1 gün yerine
+          maxAge: 86400, // 24 saat (saniyeler) - 12 saat yerine
         },
         
         // Otomatik düzeltmeler ve cache busting için
@@ -77,18 +85,40 @@ export async function GET(req: NextRequest) {
           return;
         }
         
+        // WebSocket transport izleme
+        socket.conn.on("upgrade", (transport) => {
+          console.log(`[Socket ${socket.id}] WebSocket'e yükseltildi`);
+        });
+        
+        // Transport durumunu kontrol et
+        if (socket.conn.transport.name === "polling") {
+          console.log(`[Socket ${socket.id}] Polling modunda çalışıyor`);
+          
+          // 30 saniye sonra WebSocket'e geçemediyse uyarı log'u
+          setTimeout(() => {
+            if (socket.connected && socket.conn.transport.name === "polling") {
+              console.log(`[Socket ${socket.id}] Hala polling modunda - WebSocket mümkün olmayabilir`);
+            }
+          }, 30000);
+        }
+        
         // Kullanıcı bazlı izleme
         const userId = socket.handshake.auth?.userId;
         if (userId) {
           socket.join(`user:${userId}`);
-           
-          // WebSocket'e yükseltmeyi destekle
-          socket.conn.on("upgrade", () => {
-            // WebSocket bağlantısı başlatıldı
-            // İşlemler burada yapılabilir
+          
+          // Kullanıcıya özel oda oluştur
+          socket.join(`user:${userId}`);
+          
+          // Kullanıcıya bağlantı başarılı bildirimi
+          socket.emit("connect_success", { 
+            socketId: socket.id,
+            userId,
+            transport: socket.conn.transport.name
           });
         } else {
           // Kullanıcı kimliği yoksa hemen bağlantıyı kapat
+          console.log(`[Socket ${socket.id}] Kimlik doğrulama yok - bağlantı kapatılacak`);
           setTimeout(() => {
             socket.disconnect(true);
           }, 5000);
@@ -98,20 +128,29 @@ export async function GET(req: NextRequest) {
           const userId = data?.userId;
           if (userId) {
             socket.join(`user:${userId}`);
+            // Başarılı bildirim
+            socket.emit("auth_success", { userId });
           } else {
             // Kimlik doğrulama başarısız, bağlantıyı kapat
+            socket.emit("auth_error", { message: "Kullanıcı kimliği geçersiz" });
             socket.disconnect(true);
           }
         });
         
         // Hafif ping-pong mekanizması
         socket.on("ping", () => {
-          socket.emit("pong");
+          socket.emit("pong", { time: Date.now() });
+        });
+        
+        // Hata yakalama
+        socket.on("error", (error) => {
+          console.error(`[Socket ${socket.id}] Hata:`, error);
         });
         
         // İstemci bağlantısı kapandığında kaynakları serbest bırak
-        socket.on("disconnect", () => {
+        socket.on("disconnect", (reason) => {
           connectionCount--;
+          console.log(`[Socket ${socket.id}] Bağlantı kesildi, neden: ${reason}`);
           if (userId) {
             socket.leave(`user:${userId}`);
           }
@@ -120,6 +159,7 @@ export async function GET(req: NextRequest) {
         
         // Uzun süredir boşta kalan soketleri kapat
         const inactivityTimeout = setTimeout(() => {
+          console.log(`[Socket ${socket.id}] İnaktif - bağlantı kapatılıyor`);
           socket.disconnect(true);
         }, 30 * 60 * 1000); // 30 dakika
         
@@ -128,22 +168,38 @@ export async function GET(req: NextRequest) {
           clearTimeout(inactivityTimeout);
         });
       });
+      
+      // Sunucu performans izleme
+      setInterval(() => {
+        const clientCount = io?.engine?.clientsCount || 0;
+        console.log(`[Socket.IO Stats] Bağlı istemci: ${clientCount}, Toplam bağlantı: ${connectionCount}`);
+      }, 60000); // Her dakika
     }
     
     return NextResponse.json({ 
       success: true, 
       message: "Socket.IO sunucusu hazır",
       environment: isProd ? 'production' : 'development',
-      connections: connectionCount
+      connections: connectionCount,
+      transports: ['websocket', 'polling'],
+      timestamp: new Date().toISOString()
     }, {
       headers: {
+        'Access-Control-Allow-Origin': corsOrigin,
+        'Access-Control-Allow-Methods': 'GET, POST',
+        'Access-Control-Allow-Credentials': 'true',
         'Cache-Control': 'no-store, must-revalidate',
         'Pragma': 'no-cache'
       }
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error("Socket.IO API hatası:", error);
     return NextResponse.json(
-      { success: false, message: "Socket.IO sunucusu başlatılamadı", error },
+      { 
+        success: false, 
+        message: "Socket.IO sunucusu başlatılamadı", 
+        error: error.message || "Bilinmeyen hata"
+      },
       { 
         status: 500,
         headers: {

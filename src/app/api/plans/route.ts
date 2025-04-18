@@ -6,6 +6,8 @@ import { isValidObjectId } from '@/lib/utils';
 import { ObjectId } from 'mongodb';
 import { getToken } from 'next-auth/jwt';
 import mongoose from 'mongoose';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/auth';
 
 // Tip tanımlamaları
 interface ICreator {
@@ -195,114 +197,88 @@ export async function GET(request: NextRequest) {
 }
 
 // Plan oluşturma
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    await connectDB();
-    const token = await getToken({ req: request as any });
-
-    if (!token || !token.sub) {
-      return NextResponse.json(
-        { error: "Geçersiz kullanıcı ID'si" },
-        { status: 401 }
-      );
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    const userId = token.sub;
-    const body = await request.json();
+    await connectDB();
     
-    // Creator bilgisini kontrol et - eksikse hata döndür
-    if (!body.creator && !userId) {
+    const body = await req.json();
+    
+    // User ID kontrolü
+    let userId;
+    if (session?.user?.id) {
+      userId = session.user.id;
+    } else if ((session?.user as any)?._id) {
+      // Tip dönüşümü gerekli
+      userId = (session.user as any)._id;
+    } else {
+      return NextResponse.json({ error: "Kullanıcı kimliği bulunamadı" }, { status: 400 });
+    }
+    
+    // Eğer creator farklı bir değerle geldiyse (güvenlik açısından) userId ile değiştir
+    body.creator = userId;
+    
+    // CreatorInfo alanını kontrol et ve güncelle
+    // Eğer zaten varsa ek bilgileri kabul et ama _id'yi doğrula
+    if (body.creatorInfo) {
+      body.creatorInfo._id = userId; // Kullanıcı ID'si mutlaka doğru olmalı
+    }
+    
+    // Zorunlu alanları kontrol et
+    if (!body.title || !body.description || !body.startDate) {
       return NextResponse.json(
-        { error: "Creator bilgisi zorunludur" },
+        { error: "Gerekli bilgiler eksik (başlık, açıklama, başlangıç tarihi zorunludur)" },
         { status: 400 }
       );
     }
     
-    console.log("Plan oluşturma isteği:", { userId, email: token.email });
-
-    // Kullanıcıyı bulmak için tüm olası alanları kontrol et
-    let user: any = null;
+    // Tarih formatını kontrol et
+    const startDate = new Date(body.startDate);
+    const endDate = body.endDate ? new Date(body.endDate) : null;
     
-    // 1. Email ile ara (en güvenilir yöntem)
-    if (token.email) {
-      user = await User.findOne({ email: token.email });
-      console.log("Email araması:", token.email, !!user);
+    if (isNaN(startDate.getTime())) {
+      return NextResponse.json({ error: "Geçersiz başlangıç tarihi formatı" }, { status: 400 });
     }
     
-    // 2. Hala bulunamadıysa, ObjectId ile ara
-    if (!user && mongoose.Types.ObjectId.isValid(userId)) {
-      user = await User.findById(userId);
-      console.log("ObjectId araması:", userId, !!user);
+    if (endDate && isNaN(endDate.getTime())) {
+      return NextResponse.json({ error: "Geçersiz bitiş tarihi formatı" }, { status: 400 });
     }
     
-    // 3. OAuth ID ile ara
-    if (!user) {
-      user = await User.findOne({ 
-        $or: [
-          { oauth_id: userId },
-          { googleId: userId },
-          { "accounts.providerAccountId": userId }
-        ] 
-      });
-      console.log("OAuth ID araması:", userId, !!user);
-    }
-    
-    // Kullanıcı bulunamamışsa, yeni kullanıcı oluştur
-    if (!user && token.email) {
-      console.log("Kullanıcı bulunamadı, yeni oluşturuluyor:", token.email);
-      
-      // Kullanıcı adı oluştur
-      const username = token.email.split('@')[0] + Math.floor(Math.random() * 1000);
-      
-      user = new User({
-        email: token.email,
-        name: token.name || username,
-        username: username,
-        oauth_id: userId,
-        profilePicture: token.picture || "/images/avatars/default.png",
-        createdPlans: []
-      });
-      
-      await user.save();
-      console.log("Yeni kullanıcı oluşturuldu:", user._id);
-    }
-    
-    if (!user) {
-      console.log("Kullanıcı bulunamadı ve oluşturulamadı:", userId);
+    // Bitiş tarihi başlangıç tarihinden önce olamaz
+    if (endDate && endDate < startDate) {
       return NextResponse.json(
-        { error: 'Creator kullanıcı bulunamadı' },
-        { status: 404 }
+        { error: "Bitiş tarihi başlangıç tarihinden önce olamaz" },
+        { status: 400 }
       );
     }
-
-    console.log("Bulunan kullanıcı:", user._id);
-
-    // Yeni planı oluştur - creator olarak user._id kullan (string ID değil)
-    const newPlan = new Plan({
-      ...body,
-      creator: user._id // Google OAuth ID'si yerine kullanıcının Mongo ID'sini kullan
-    });
-
-    await newPlan.save();
-    console.log("Plan kaydedildi:", newPlan._id);
-
-    // Kullanıcının oluşturduğu planlara ekle
-    if (!user.createdPlans) {
-      user.createdPlans = [];
-    }
-    user.createdPlans.push(newPlan._id);
-    await user.save();
-    console.log("Kullanıcı güncellendi");
-
-    // Detaylı plan verisi dön
-    const populatedPlan = await Plan.findById(newPlan._id)
-      .populate('creator', 'username firstName lastName name profilePicture googleProfilePicture image email oauth_id')
-      .populate('participants', 'username firstName lastName profilePicture googleProfilePicture image email')
-      .lean();
     
-    return NextResponse.json(populatedPlan, { status: 201 });
+    // Yeni plan oluştur
+    const plan = await Plan.create(body);
+    
+    // Kullanıcının planlarını güncelle
+    if (plan._id) {
+      // Kullanıcı document'ini bul ve güncelle
+      await User.findByIdAndUpdate(
+        userId,
+        {
+          $addToSet: { createdPlans: plan._id },
+        },
+        { new: true }
+      );
+    }
+    
+    return NextResponse.json(plan, { status: 201 });
+    
   } catch (error: any) {
-    console.error('Plan oluşturma hatası:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Plans API error:", error);
+    return NextResponse.json(
+      { error: error.message || "An error occurred" },
+      { status: 500 }
+    );
   }
 } 

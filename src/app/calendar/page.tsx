@@ -281,6 +281,7 @@ export default function Calendar() {
                       maxParticipants={plan.maxParticipants}
                       participantCount={plan.participants?.length || 0}
                       isJoined={true}
+                      plan={plan}
                     />
                   ))}
                 </div>
@@ -323,6 +324,7 @@ export default function Calendar() {
                     maxParticipants={plan.maxParticipants}
                     participantCount={plan.participants?.length || 0}
                     isJoined={true}
+                    plan={plan}
                   />
                 ))}
               </div>

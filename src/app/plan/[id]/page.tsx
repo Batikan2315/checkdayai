@@ -1,930 +1,393 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import Image from "next/image";
-import Button from "@/components/ui/Button";
-import { Card, CardBody, CardFooter, CardHeader } from "@/components/ui/Card";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { FaUsers, FaCalendarAlt, FaMapMarkerAlt, FaHeart, FaRegHeart, FaBookmark, FaRegBookmark, FaShare, FaUser } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import { useSession } from "next-auth/react";
-import { 
-  FaPencilAlt, 
-  FaUsers, 
-  FaComment, 
-  FaTrash, 
-  FaInfoCircle, 
-  FaCalendarAlt, 
-  FaClock, 
-  FaHourglassHalf, 
-  FaMapMarkerAlt, 
-  FaLink, 
-  FaExclamationTriangle,
-  FaHeart,
-  FaRegHeart,
-  FaBookmark,
-  FaRegBookmark,
-  FaShare,
-  FaEdit,
-  FaTimes,
-  FaImage,
-  FaUserPlus,
-  FaUserMinus,
-  FaCalendarPlus
-} from "react-icons/fa";
-import { BsCalendar } from "react-icons/bs";
-import { PlanActions } from "@/components/PlanActions";
 import Link from "next/link";
+import PageContainer from "@/components/layout/PageContainer";
+import { getPlan, joinPlan, likePlan, savePlan } from "@/services/planService";
+import { format } from "date-fns";
+import { tr } from "date-fns/locale";
 
-// Varsayılan profil resmi için güvenli yol
-const DEFAULT_AVATAR = "/images/avatars/default.png";
+// Yardımcı fonksiyonlar
+const sendNotification = async (data: any) => {
+  console.log("Bildirim gönderildi:", data);
+  return true;
+};
 
-export default function PlanDetail() {
+const shareContent = (data: { title: string, text: string, url: string }) => {
+  if (navigator.share) {
+    navigator.share(data);
+  } else {
+    // Fallback: URL'i panoya kopyala
+    navigator.clipboard.writeText(data.url);
+    toast.success("Link panoya kopyalandı!");
+  }
+};
+
+// UI bileşenleri
+const Loading = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+  </div>
+);
+
+const NotFound = () => (
+  <div className="flex flex-col items-center justify-center min-h-screen">
+    <h1 className="text-2xl font-bold mb-4">Plan Bulunamadı</h1>
+    <p className="text-gray-600 mb-6">Aradığınız plan silinmiş veya mevcut değil.</p>
+    <Link 
+      href="/plans" 
+      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+    >
+      Planlara Dön
+    </Link>
+  </div>
+);
+
+export default function PlanPage() {
   const params = useParams();
   const id = params?.id as string;
-  const router = useRouter();
   const { data: session } = useSession();
   const [plan, setPlan] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
-  const [liking, setLiking] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [leaving, setLeaving] = useState(false);
-  const [showContent, setShowContent] = useState(false);
+  const [error, setError] = useState<any>(null);
+  const [hasLiked, setHasLiked] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
+  const [isParticipant, setIsParticipant] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
   
-  // Kullanıcı kimliği
-  const userId = session?.user?.id || null;
-
+  // Veriyi yükleme
   useEffect(() => {
-    // API'den plan detaylarını getir
-    const fetchPlan = async () => {
+    const loadPlan = async () => {
       try {
-        // Session kontrolü - gereksiz API çağrılarını önle
-        if (typeof window !== 'undefined') {
-          const lastFetchTime = localStorage.getItem(`planDetail_${id}_lastFetch`);
-          const currentTime = Date.now();
-          
-          // Son istekten beri 30 saniye geçmediyse ve önbellekte veri varsa tekrar istek atma
-          if (lastFetchTime && currentTime - parseInt(lastFetchTime) < 30000) {
-            const cachedPlan = localStorage.getItem(`planDetail_${id}`);
-            if (cachedPlan) {
-              try {
-                const parsedPlan = JSON.parse(cachedPlan);
-                console.log('Önbellekten plan detayları kullanılıyor');
-                setPlan(parsedPlan);
-                
-                // Kullanıcının beğeni ve kaydetme durumunu kontrol et
-                if (userId) {
-                  setLiked(parsedPlan.likes?.includes(userId));
-                  setSaved(parsedPlan.saves?.includes(userId));
-                }
-                
-                setLoading(false);
-                return;
-              } catch (e) {
-                console.error('Önbellekten plan işlenirken hata:', e);
-                // Önbelleği temizle ve devam et
-                localStorage.removeItem(`planDetail_${id}`);
-              }
-            }
-          }
-        }
-        
-        const response = await fetch(`/api/plans/${id}`);
-        
-        if (!response.ok) {
-          throw new Error('Plan detayları getirilemedi');
-        }
-        
-        const data = await response.json();
-        console.log("Plan detayları:", data);
-        
-        // Önbelleğe kaydet
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(`planDetail_${id}`, JSON.stringify(data));
-          localStorage.setItem(`planDetail_${id}_lastFetch`, Date.now().toString());
-        }
-        
+        setLoading(true);
+        const data = await getPlan(id);
         setPlan(data);
         
-        // Kullanıcının beğeni ve kaydetme durumunu kontrol et
-        if (userId) {
-          setLiked(data.likes?.includes(userId));
-          setSaved(data.saves?.includes(userId));
-        }
-        
-        // Kullanıcı katılım durumunu kontrol et
-        if (session?.user?.id) {
-          // Creator kontrolü
-          const isCreator = data.creator?._id === session.user.id || 
-                          data.creator === session.user.id;
-                          
-          // Katılımcı kontrolü
-          const isParticipant = data.participants?.some(
-            (p: any) => 
-              p?._id?.toString() === session.user.id || 
-              p?.toString() === session.user.id
-          );
+        if (session?.user?.id && data) {
+          // Kullanıcı planda mı?
+          setIsParticipant(data?.participants?.some((p: any) => p._id === session?.user?.id));
           
-          // Creator veya katılımcıysa içeriği göster
-          if (isCreator || isParticipant) {
-            setShowContent(true);
-          }
+          // Kullanıcı oluşturucu mu?
+          setIsCreator(data.creator?._id === session?.user?.id);
+          
+          // Planı beğenmiş mi?
+          setHasLiked(data.likes?.some((like: any) => like.userId === session?.user?.id));
+          
+          // Planı kaydetmiş mi?
+          setHasSaved(data.saves?.some((save: any) => save.userId === session?.user?.id));
         }
         
         setLoading(false);
-      } catch (error) {
-        console.error("Plan yüklenirken hata:", error);
+      } catch (e) {
+        console.error("Plan yüklenirken hata:", e);
+        setError(e);
         setLoading(false);
       }
     };
-
-    fetchPlan();
-  }, [id, userId, session?.user?.id, router]);
-
-  const handleJoin = async () => {
-    if (!userId) {
-      toast.error('Katılmak için giriş yapmalısınız');
+    
+    if (id) {
+      loadPlan();
+    }
+  }, [id, session]);
+  
+  // Tarih formatı
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return format(date, "d MMMM yyyy", { locale: tr });
+    } catch (error) {
+      return "Tarih bilgisi yok";
+    }
+  };
+  
+  // Saat formatı
+  const formatTime = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return format(date, "HH:mm", { locale: tr });
+    } catch (error) {
+      return "--:--";
+    }
+  };
+  
+  // Kullanıcı katılabilir mi?
+  const canJoin = !isParticipant && !isCreator && plan?.status === "active";
+  
+  // Katılım durumu mesajı
+  const joinStatusMessage = isCreator 
+    ? "Bu planın oluşturucusunuz" 
+    : isParticipant 
+      ? "Bu plana katıldınız" 
+      : "";
+  
+  // Plan etkileşim işlemleri
+  const handleJoinPlan = async () => {
+    if (!session?.user?.id) {
+      toast.error("Bu işlem için giriş yapmalısınız");
       return;
     }
     
     try {
-      setJoining(true);
+      await joinPlan(id);
+      setIsParticipant(true);
+      toast.success("Plana başarıyla katıldınız!");
       
-      // API'ye katılma isteği gönder
-      const response = await fetch(`/api/plans/${id}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Plana katılırken bir hata oluştu');
+      // Bildirim gönderme (opsiyonel)
+      try {
+        await sendNotification({
+          recipientId: plan.creator._id,
+          type: "join_plan",
+          content: `${session.user.name || session.user.username} planınıza katıldı`,
+          link: `/plan/${plan._id}`,
+          initiatorId: session.user.id
+        });
+      } catch (e) {
+        console.error("Bildirim gönderilirken hata:", e);
       }
-      
-      toast.success('Plana başarıyla katıldınız!');
-      
-      // Planı güncelle
-      const updatedPlan = await fetch(`/api/plans/${id}`).then(res => res.json());
-      setPlan(updatedPlan);
-      
-    } catch (error: any) {
-      toast.error(error.message || 'Plana katılırken bir hata oluştu');
-      console.error('Katılma hatası:', error);
-    } finally {
-      setJoining(false);
+    } catch (e) {
+      console.error("Plana katılırken hata:", e);
+      toast.error("Plana katılırken bir hata oluştu");
     }
   };
-
-  const handleLeave = async () => {
-    if (!userId) {
-      toast.error('Ayrılmak için giriş yapmalısınız');
-      return;
-    }
-    
-    if (!confirm('Plandan ayrılmak istediğinize emin misiniz?')) {
+  
+  const handleLikePlan = async () => {
+    if (!session?.user?.id) {
+      toast.error("Bu işlem için giriş yapmalısınız");
       return;
     }
     
     try {
-      setLeaving(true);
-      
-      // API'ye ayrılma isteği gönder
-      const response = await fetch(`/api/plans/${id}/participate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          action: 'leave'
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Plandan ayrılırken bir hata oluştu');
-      }
-      
-      toast.success('Plandan ayrıldınız');
-      
-      // Planı güncelle
-      const updatedPlan = await fetch(`/api/plans/${id}`).then(res => res.json());
-      setPlan(updatedPlan);
-      
-      // Planlar sayfasına yönlendir
-      router.push('/plans');
-      
-    } catch (error: any) {
-      toast.error(error.message || 'Plandan ayrılırken bir hata oluştu');
-      console.error('Ayrılma hatası:', error);
-    } finally {
-      setLeaving(false);
+      await likePlan(id);
+      setHasLiked(!hasLiked);
+      setPlan(prev => ({
+        ...prev,
+        likes: hasLiked 
+          ? prev.likes.filter((like: any) => like.userId !== session?.user?.id)
+          : [...prev.likes, { userId: session?.user?.id }]
+      }));
+      toast.success(hasLiked ? "Beğeni kaldırıldı" : "Plan beğenildi");
+    } catch (e) {
+      console.error("Plan beğenilirken hata:", e);
+      toast.error("İşlem sırasında bir hata oluştu");
     }
   };
-
-  const handleLike = async () => {
-    if (!userId) {
-      toast.error('Beğenmek için giriş yapmalısınız');
+  
+  const handleSavePlan = async () => {
+    if (!session?.user?.id) {
+      toast.error("Bu işlem için giriş yapmalısınız");
       return;
     }
     
     try {
-      setLiking(true);
-      
-      // API'ye beğenme isteği gönder
-      const response = await fetch(`/api/plans/${id}/like`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          action: liked ? 'unlike' : 'like'
-        }),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'İşlem sırasında bir hata oluştu');
-      }
-      
-      const updatedPlan = await fetch(`/api/plans/${id}`).then(res => res.json());
-      setPlan(updatedPlan);
-      setLiked(!liked);
-      
-    } catch (error: any) {
-      toast.error(error.message || 'İşlem sırasında bir hata oluştu');
-      console.error('Beğenme hatası:', error);
-    } finally {
-      setLiking(false);
+      await savePlan(id);
+      setHasSaved(!hasSaved);
+      setPlan(prev => ({
+        ...prev,
+        saves: hasSaved 
+          ? prev.saves.filter((save: any) => save.userId !== session?.user?.id)
+          : [...prev.saves, { userId: session?.user?.id }]
+      }));
+      toast.success(hasSaved ? "Plan kaydedildi" : "Plan kayıtlardan kaldırıldı");
+    } catch (e) {
+      console.error("Plan kaydedilirken hata:", e);
+      toast.error("İşlem sırasında bir hata oluştu");
     }
   };
-
-  const handleSave = async () => {
-    if (!userId) {
-      toast.error('Kaydetmek için giriş yapmalısınız');
-      return;
-    }
-    
-    try {
-      setSaving(true);
-      
-      // API'ye kaydetme isteği gönder
-      const response = await fetch(`/api/plans/${id}/save`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          action: saved ? 'unsave' : 'save'
-        }),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'İşlem sırasında bir hata oluştu');
-      }
-      
-      const updatedPlan = await fetch(`/api/plans/${id}`).then(res => res.json());
-      setPlan(updatedPlan);
-      setSaved(!saved);
-      
-    } catch (error: any) {
-      toast.error(error.message || 'İşlem sırasında bir hata oluştu');
-      console.error('Kaydetme hatası:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
+  
   const handleShare = () => {
-    // Paylaşım URL'sini oluştur
-    const shareUrl = window.location.href;
-    
-    // Tarayıcı paylaşım API'sini kontrol et
-    if (navigator.share) {
-      navigator.share({
-        title: plan?.title || 'CheckDay Planı',
-        text: plan?.description?.substring(0, 100) + '...' || 'CheckDay planına göz at!',
-        url: shareUrl,
-      })
-      .then(() => console.log('Başarıyla paylaşıldı'))
-      .catch((error) => console.error('Paylaşım hatası:', error));
-    } else {
-      // Fallback: URL'yi panoya kopyala
-      navigator.clipboard.writeText(shareUrl)
-        .then(() => toast.success('Plan bağlantısı panoya kopyalandı'))
-        .catch(() => toast.error('Bağlantı kopyalanamadı'));
-    }
-  };
-
-  const handleAddToCalendar = () => {
-    // TODO: Google/Apple Calendar entegrasyonu
-    alert('Takvim entegrasyonu yakında eklenecek!');
-  };
-
-  const handleEditPlan = () => {
-    router.push(`/plan/${id}/edit`);
+    shareContent({
+      title: plan.title,
+      text: plan.description,
+      url: window.location.href
+    });
   };
   
-  const handleDeletePlan = async () => {
-    if (!confirm('Bu planı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) {
-      return;
-    }
-    
-    try {
-      const response = await fetch(`/api/plans/${id}`, {
-        method: 'DELETE',
-      });
+  // Seçenek butonları render
+  const renderActionButtons = () => (
+    <div className="flex flex-wrap gap-3 my-4">
+      {!isCreator && canJoin && (
+        <button 
+          onClick={handleJoinPlan}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors shadow-sm flex items-center justify-center gap-2"
+          disabled={loading}
+        >
+          <FaUsers /> Katıl
+        </button>
+      )}
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Plan silinirken bir hata oluştu');
-      }
+      <button 
+        onClick={handleLikePlan}
+        className={`px-4 py-2 ${hasLiked ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-md focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition-colors shadow-sm flex items-center justify-center gap-2`}
+        disabled={loading}
+      >
+        {hasLiked ? <FaHeart className="text-red-500" /> : <FaRegHeart />}
+        {hasLiked ? 'Beğenildi' : 'Beğen'} 
+        {plan?.likes?.length > 0 && <span className="text-xs">({plan.likes.length})</span>}
+      </button>
       
-      toast.success('Plan başarıyla silindi');
-      router.push('/plans');
+      <button 
+        onClick={handleSavePlan}
+        className={`px-4 py-2 ${hasSaved ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-md focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition-colors shadow-sm flex items-center justify-center gap-2`}
+        disabled={loading}
+      >
+        {hasSaved ? <FaBookmark className="text-blue-500" /> : <FaRegBookmark />}
+        {hasSaved ? 'Kaydedildi' : 'Kaydet'}
+      </button>
       
-    } catch (error: any) {
-      toast.error(error.message || 'Plan silinirken bir hata oluştu');
-      console.error('Plan silme hatası:', error);
-    }
-  };
-
-  const handleAddLeader = () => {
-    // TODO: Creator ekleme modalı
-    alert('Creator ekleme özelliği yakında eklenecek!');
-  };
-
-  // Kullanıcının bu plana katılmış olup olmadığını kontrol et
-  const isUserJoined = useMemo(() => {
-    if (!plan || !userId) return false;
-    
-    // Eğer kullanıcı plana katılmışsa veya planın yaratıcısıysa
-    const isCreator = plan.creator ? (plan.creator?._id === userId || plan.creator === userId) : false;
-    const isParticipant = plan.participants ? plan.participants.some((p: any) => 
-      (p?.id === userId || p === userId || (typeof p === 'object' && p?._id === userId))
-    ) : false;
-    
-    return isCreator || isParticipant;
-  }, [plan, userId]);
-  
-  // Kullanıcının plan creator'ı olup olmadığını kontrol et
-  const isLeader = userId && plan?.leaders ? plan.leaders.some((leader: any) => {
-    if (!leader) return false;
-    if (typeof leader === 'object') {
-      return leader._id === userId;
-    }
-    return leader === userId;
-  }) : false;
-  
-  // Kullanıcının düzenleme yetkisi var mı (oluşturucu veya creator)
-  const canEdit = isUserJoined || isLeader;
-  
-  // Plan saatinin geçip geçmediğini kontrol et
-  const isPlanPast = plan && plan.endDate ? new Date(plan.endDate) < new Date() : false;
-  
-  // Kullanıcının plana katılıp katılmadığını veya planın sahibi olup olmadığını kontrol et
-  const showJoinButton = !isUserJoined && !canEdit && !isPlanPast;
-  const showLeaveButton = isUserJoined && !canEdit && !isPlanPast;
-  
-  // Creator bilgilerini gösterme
-  const renderLeadersInfo = useMemo(() => {
-    if (!plan || !plan.leaders || !Array.isArray(plan.leaders) || plan.leaders.length === 0) return null;
-    
-    return (
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="text-lg font-semibold">Creators</h2>
-          {canEdit && (
-            <button 
-              onClick={handleAddLeader}
-              className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600"
-              aria-label="Creator Ekle"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-            </button>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {plan.leaders.map((leader: any, index: number) => {
-            let creatorName = 'Anonim';
-            let creatorAvatar = '/images/avatars/default.png';
-            let creatorUsername = '';
-            
-            if (typeof leader === 'object') {
-              if (leader.firstName && leader.lastName) {
-                creatorName = `${leader.firstName} ${leader.lastName}`;
-              } else if (leader.username) {
-                creatorName = `@${leader.username}`;
-              }
-              
-              creatorUsername = leader.username || '';
-              
-              if (leader.profilePicture) {
-                creatorAvatar = leader.profilePicture;
-              }
-            }
-            
-            return (
-              <div key={index} className="flex items-center">
-                <div className="w-8 h-8 rounded-full overflow-hidden mr-2">
-                  <img 
-                    src={creatorAvatar} 
-                    alt={creatorName}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/images/avatars/default.png';
-                    }}
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm">{creatorName}</span>
-                  {creatorUsername && (
-                    <a 
-                      href={`/@${creatorUsername}`} 
-                      className="text-xs text-blue-500 hover:underline"
-                    >
-                      @{creatorUsername}
-                    </a>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }, [plan, canEdit]);
-
-  // Süre hesaplama fonksiyonu
-  const calculateDuration = (start: Date | string | null | undefined, end: Date | string | null | undefined) => {
-    if (!start || !end) return "Belirtilmemiş";
-    
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    
-    // Geçerli tarihler mi kontrol et
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      return "Belirtilmemiş";
-    }
-    
-    const diffInMs = endDate.getTime() - startDate.getTime();
-    const diffInHours = diffInMs / (1000 * 60 * 60);
-    
-    if (diffInHours < 24) {
-      return `${Math.round(diffInHours)} saat`;
-    } else {
-      const diffInDays = diffInHours / 24;
-      return `${Math.round(diffInDays)} gün`;
-    }
-  };
-
-  // Bitiş tarihine kalan gün sayısını hesapla
-  const calculateCountdown = (endDate: string | Date) => {
-    if (!endDate) return 0;
-    
-    const now = new Date();
-    const end = new Date(endDate);
-    
-    // Geçersiz tarih kontrolü
-    if (isNaN(end.getTime())) return 0;
-    
-    const diff = end.getTime() - now.getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  };
-
-  // Kullanıcı plan detaylarını görüntülemek istiyor
-  useEffect(() => {
-    if (!loading && plan && !isUserJoined && !isLeader) {
-      // Kullanıcı plana katılmamışsa katılması için bir uyarı göster
-      toast.custom((t) => (
-        <div className="max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5">
-          <div className="flex-1 p-4">
-            <div className="flex items-start">
-              <div className="flex-shrink-0">
-                <FaExclamationTriangle className="h-6 w-6 text-yellow-400" />
-              </div>
-              <div className="ml-3 flex-1">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Bu plana henüz katılmadınız
-                </p>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Plan detaylarını tam olarak görüntülemek için katılmanız önerilir.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="border-l border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => toast.dismiss(t.id)}
-              className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none"
-            >
-              Tamam
-            </button>
-          </div>
-        </div>
-      ));
-    }
-  }, [loading, plan, isUserJoined, isLeader]);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (!plan) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <div className="text-center mb-8">
-          <FaInfoCircle className="text-red-500 text-5xl mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Plan Bulunamadı</h1>
-          <p className="text-gray-600 mb-6">Aradığınız plan silinmiş olabilir veya erişim izniniz olmayabilir.</p>
-          <Button onClick={() => router.push('/plans')}>
-            Tüm Planları Görüntüle
-          </Button>
-        </div>
-      </div>
-    );
-  }
-  
-  // Kullanıcı plana katılmamışsa ve planın oluşturucusu değilse
-  if (!showContent && session?.user?.id) {
-    // Creator kontrolü
-    const isCreator = plan?.creator?._id === session.user.id || 
-                       plan?.creator === session.user.id;
-    
-    // Eğer creator ise içeriği göster
-    if (isCreator) {
-      return (
-        <div className="container mx-auto px-4 py-10">
-          {/* Plan içeriği normal şekilde render edilecek */}
-          {/* Bu kısımda kod tekrarı yapmak yerine ana return kısmına devam et */}
-        </div>
-      );
-    }
-    
-    // Creator değilse katılması gerektiğini belirt
-    return (
-      <div className="container mx-auto px-4 py-10">
-        <Card>
-          <CardBody className="text-center py-10">
-            <h2 className="text-xl font-semibold mb-4">Bu planın detaylarını görmek için katılmanız gerekiyor</h2>
-            <p className="mb-6 text-gray-600 dark:text-gray-400">
-              Bu plan sadece katılımcılar tarafından görüntülenebilir. Detayları görmek için plana katılın.
-            </p>
-            <div className="max-w-xs mx-auto">
-              <Button
-                onClick={handleJoin}
-                loading={joining}
-              >
-                <FaUserPlus className="mr-2" /> Katıl
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
-    );
-  }
-  
-  // Kullanıcı giriş yapmamışsa
-  if (!session && !loading) {
-    return (
-      <div className="container mx-auto px-4 py-10">
-        <Card>
-          <CardBody className="text-center py-10">
-            <h2 className="text-xl font-semibold mb-4">Bu planın detaylarını görmek için giriş yapmanız gerekiyor</h2>
-            <p className="mb-6 text-gray-600 dark:text-gray-400">
-              Bu plan sadece giriş yapmış kullanıcılar tarafından görüntülenebilir.
-            </p>
-            <div className="max-w-xs mx-auto">
-              <Button variant="primary" onClick={() => router.push('/login')}>
-                Giriş Yap
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
-    );
-  }
-  
-  // Güvenli bir şekilde verilere eriş
-  const planTitle = plan.title || 'İsimsiz Plan';
-  const planDate = plan.startDate ? formatDate(new Date(plan.startDate)) : 'Tarih belirtilmemiş';
-  const planEndDate = plan.endDate ? formatDate(new Date(plan.endDate)) : 'Tarih belirtilmemiş';
-  const planTime = plan.time || 'Saat belirtilmemiş';
-  const planLocation = plan.location || 'Konum belirtilmemiş';
-  const planDescription = plan.description || 'Açıklama yok';
-  const planCreator = plan.creator?.name || plan.creatorName || 'Bilinmeyen kullanıcı';
-  const planMaxParticipants = plan.maxParticipants || 'Sınırsız';
-  const planParticipants = plan.participants || [];
-  const planImage = plan.image || '/images/default-plan.jpg';
-  const planCategory = plan.category || 'Genel';
-
-  const isParticipant = plan.participants?.some((participant: any) => 
-    participant?._id === userId || participant === userId || 
-    (typeof participant === 'object' && participant?._id === userId)
+      <button 
+        onClick={handleShare}
+        className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-md focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition-colors shadow-sm flex items-center justify-center gap-2"
+        disabled={loading}
+      >
+        <FaShare /> Paylaş
+      </button>
+    </div>
   );
   
-  const isCreator = plan.creator?._id === userId || plan.creator === userId;
+  if (loading) {
+    return <Loading />;
+  }
   
-  const canEditPlan = isCreator || plan.leaders?.includes(userId);
-  const hasJoined = isParticipant || isCreator;
+  if (!plan || error) {
+    return <NotFound />;
+  }
   
-  // Plan tarihleri
-  const startDate = plan.startDate ? new Date(plan.startDate) : null;
-  const endDate = plan.endDate ? new Date(plan.endDate) : null;
-  
-  // Bitiş tarihi geçmiş mi kontrol et
-  const isExpired = endDate ? new Date() > endDate : false;
-
   return (
-    <div className="bg-white dark:bg-gray-900 min-h-screen">
-      <div className="container mx-auto px-4 py-8">
-        {/* Plan Başlığı ve Durum Bilgisi */}
-        <div className="mb-6 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{planTitle}</h1>
-          <div className="flex space-x-2">
-            {isPlanPast && (
-              <span className="bg-gray-200 text-gray-800 text-sm font-medium px-3 py-1 rounded-full">
-                Tamamlandı
-              </span>
-            )}
-            {isUserJoined && !isLeader && (
-              <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
-                Katılımcı
-              </span>
-            )}
-            {isLeader && (
-              <span className="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full">
-                Plan Lideri
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Plan resmi */}
-        <div className="relative mb-6 overflow-hidden rounded-lg">
-          {plan.imageUrl ? (
+    <PageContainer title={plan.title}>
+      <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden">
+        {/* Görsel */}
+        {plan.image && (
+          <div className="relative h-60 md:h-80 w-full">
             <Image
-              src={plan.imageUrl}
+              src={plan.image}
               alt={plan.title}
-              width={800}
-              height={400}
-              className="h-[300px] w-full object-cover"
+              fill
+              className="object-cover"
             />
-          ) : (
-            <div className="flex h-[300px] w-full items-center justify-center bg-gray-200 dark:bg-gray-800">
-              <FaInfoCircle className="h-16 w-16 text-gray-400" />
+          </div>
+        )}
+        
+        <div className="p-6">
+          {/* Plan Oluşturucu Bilgisi */}
+          <div className="flex items-center mb-4">
+            <div className="relative w-10 h-10 rounded-full overflow-hidden mr-3 border border-gray-200">
+              {plan.creator?.image ? (
+                <Image
+                  src={plan.creator.image}
+                  alt={plan.creator.name || "Kullanıcı"}
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <div className="flex items-center justify-center w-full h-full bg-gray-200 dark:bg-gray-700 text-gray-500">
+                  <FaUser className="w-5 h-5" />
+                </div>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* İşlem Butonları */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {/* Katılma Butonu */}
-          {showJoinButton && (
-            <Button
-              onClick={handleJoin}
-              loading={joining}
-            >
-              <FaUserPlus className="mr-2" /> Katıl
-            </Button>
-          )}
-
-          {/* Ayrılma Butonu */}
-          {showLeaveButton && (
-            <Button
-              variant="outline"
-              onClick={handleLeave}
-              loading={leaving}
-            >
-              <FaUserMinus className="mr-2" /> Ayrıl
-            </Button>
-          )}
-
-          {/* Takvime Ekle Butonu */}
-          {(isUserJoined || canEdit) && (
-            <Button variant="outline" onClick={handleAddToCalendar}>
-              <FaCalendarPlus className="mr-2" /> Takvime Ekle
-            </Button>
-          )}
-
-          {/* Düzenleme Butonu - Sadece yaratıcı ve liderler görebilir */}
-          {isCreator && (
-            <Button variant="outline" onClick={handleEditPlan}>
-              <FaEdit className="mr-2" /> Düzenle
-            </Button>
-          )}
-
-          {/* PlanActions bileşenini kullan */}
-          {plan && <PlanActions plan={plan} />}
-
-          <Button variant="outline" onClick={handleShare}>
-            <FaInfoCircle className="mr-2" /> Paylaş
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={handleLike}
-            className={`${liked ? "text-red-500" : ""}`}
-          >
-            {liked ? <FaHeart className="mr-2" /> : <FaRegHeart className="mr-2" />}
-            {plan.likes?.length || 0}
-          </Button>
+            <div>
+              <Link href={`/${plan.creator?.username}`} className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
+                {plan.creator?.name || plan.creator?.username}
+              </Link>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Plan Oluşturucu
+              </p>
+            </div>
+          </div>
           
-          <Button
-            variant="outline"
-            onClick={handleSave}
-            className={`${saved ? "text-yellow-500" : ""}`}
-          >
-            {saved ? <FaBookmark className="mr-2" /> : <FaRegBookmark className="mr-2" />}
-            {plan.saves?.length || 0}
-          </Button>
-
-          {/* Plan Odası Butonu - Sadece katılımcılar ve oluşturucu görebilir */}
-          {(isUserJoined || isCreator) && (
-            <Link href={`/plan/${id}/room`} passHref>
-              <Button 
-                variant="outline"
-              >
-                <FaComment className="mr-2" /> Plan Odası
-              </Button>
-            </Link>
-          )}
-        </div>
-
-        {/* Sekme navigasyonunu kaldırıp direkt plan bilgilerini gösteriyoruz */}
-        <div>
-          <div className="mb-8 space-y-4">
-            <h1 className="text-3xl font-bold">{plan.title}</h1>
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+          {/* Plan Bilgileri */}
+          <div className="space-y-4">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{plan.title}</h1>
+            
+            <div className="flex flex-wrap gap-4 text-gray-600 dark:text-gray-300 text-sm">
               <div className="flex items-center">
-                <FaCalendarAlt className="mr-1 h-4 w-4" />
+                <FaCalendarAlt className="mr-2 text-blue-500" />
                 <span>
-                  {new Date(plan.startDate).toLocaleDateString('tr-TR', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
+                  {formatDate(plan.startDate)} · {formatTime(plan.startDate)}
+                  {plan.endDate && ` - ${formatDate(plan.endDate)} · ${formatTime(plan.endDate)}`}
                 </span>
               </div>
               
-              {plan?.endDate && (
-                <div className="flex items-center">
-                  <FaClock className="mr-1 h-4 w-4" />
-                  <span>
-                    {calculateCountdown(plan.endDate) > 0 
-                      ? `${calculateCountdown(plan.endDate)} gün kaldı` 
-                      : 'Süre doldu'}
-                  </span>
-                </div>
-              )}
-              
               {plan.location && (
                 <div className="flex items-center">
-                  <FaMapMarkerAlt className="mr-1 h-4 w-4" />
+                  <FaMapMarkerAlt className="mr-2 text-red-500" />
                   <span>{plan.location}</span>
                 </div>
               )}
-              
-              {plan.creator && typeof plan.creator !== 'string' && (
-                <div className="flex items-center">
-                  <FaUsers className="mr-1 h-4 w-4" />
-                  <span>Creator: {plan.creator.name}</span>
-                </div>
-              )}
-              
-              {plan.maxParticipants && (
-                <div className="flex items-center">
-                  <FaUsers className="mr-1 h-4 w-4" />
-                  <span>
-                    {plan.participants?.length || 0}/{plan.maxParticipants} Katılımcı
-                  </span>
-                </div>
-              )}
             </div>
             
-            <div className="prose dark:prose-invert max-w-none">
-              <p>{plan.description}</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <h3 className="font-semibold text-lg">Plan Bilgileri</h3>
-              </CardHeader>
-              <CardBody className="space-y-3">
-                <div className="flex">
-                  <FaCalendarAlt className="text-gray-500 mr-2 mt-1" />
-                  <div>
-                    <div className="font-medium">Tarih</div>
-                    <div>{planDate}</div>
-                  </div>
-                </div>
-                
-                <div className="flex">
-                  <FaClock className="text-gray-500 mr-2 mt-1" />
-                  <div>
-                    <div className="font-medium">Saat</div>
-                    <div>{planTime}</div>
-                  </div>
-                </div>
-                
-                <div className="flex">
-                  <FaHourglassHalf className="text-gray-500 mr-2 mt-1" />
-                  <div>
-                    <div className="font-medium">Süre</div>
-                    <div>{calculateDuration(plan.startDate, plan.endDate)}</div>
-                  </div>
-                </div>
-                
-                <div className="flex">
-                  <FaMapMarkerAlt className="text-gray-500 mr-2 mt-1" />
-                  <div>
-                    <div className="font-medium">Konum</div>
-                    <div>{plan.isOnline ? "Online Plan" : planLocation}</div>
-                  </div>
-                </div>
-                
-                {plan.isOnline && plan.onlineLink && (
-                  <div className="flex">
-                    <FaLink className="text-gray-500 mr-2 mt-1" />
-                    <div>
-                      <div className="font-medium">Bağlantı</div>
-                      <a 
-                        href={plan.onlineLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        {plan.onlineLink}
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </CardBody>
-            </Card>
+            {joinStatusMessage && (
+              <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 p-3 rounded-md text-sm">
+                {joinStatusMessage}
+              </div>
+            )}
             
-            <Card>
-              <CardHeader>
-                <h3 className="font-semibold text-lg">Creator</h3>
-              </CardHeader>
-              <CardBody>
-                {plan?.creator && (
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full overflow-hidden">
-                      <img 
-                        src={plan.creator.profilePicture || DEFAULT_AVATAR} 
-                        alt={plan.creator.name || 'Creator'}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <div className="font-medium">
-                        {plan.creator.firstName && plan.creator.lastName 
-                          ? `${plan.creator.firstName} ${plan.creator.lastName}`
-                          : plan.creator.username || 'Anonim'}
-                      </div>
-                      {plan.creator.username && (
-                        <a 
-                          href={`/${plan.creator.username}`} 
-                          className="text-sm text-blue-500 hover:underline"
-                        >
-                          @{plan.creator.username}
-                        </a>
+            {/* Aksiyonlar */}
+            {session && renderActionButtons()}
+            
+            {/* Açıklama */}
+            <div className="mt-4">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">Açıklama</h2>
+              <p className="text-gray-600 dark:text-gray-300 whitespace-pre-line">{plan.description}</p>
+            </div>
+            
+            {/* Katılımcılar */}
+            <div className="mt-6">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">Katılımcılar ({(plan.participants?.length || 0) + (isCreator ? 1 : 0)})</h2>
+              <div className="flex flex-wrap gap-2">
+                {/* Oluşturucu */}
+                {plan.creator && (
+                  <Link href={`/${plan.creator.username}`} className="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <div className="relative w-8 h-8 rounded-full overflow-hidden">
+                      {plan.creator.image ? (
+                        <Image
+                          src={plan.creator.image}
+                          alt={plan.creator.name || "Oluşturucu"}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center w-full h-full bg-gray-200 dark:bg-gray-700 text-gray-500">
+                          <FaUser className="w-4 h-4" />
+                        </div>
                       )}
                     </div>
-                  </div>
+                    <div>
+                      <p className="text-sm font-medium">{plan.creator.name || plan.creator.username}</p>
+                      <span className="text-xs text-blue-600 dark:text-blue-400">Oluşturucu</span>
+                    </div>
+                  </Link>
                 )}
-                {!plan?.creator && (
-                  <div className="text-gray-500">Creator bilgisi bulunamadı</div>
-                )}
-              </CardBody>
-            </Card>
+                
+                {/* Diğer Katılımcılar */}
+                {plan.participants?.map((participant: any) => (
+                  <Link href={`/${participant.username}`} key={participant._id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <div className="relative w-8 h-8 rounded-full overflow-hidden">
+                      {participant.image ? (
+                        <Image
+                          src={participant.image}
+                          alt={participant.name || "Katılımcı"}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center w-full h-full bg-gray-200 dark:bg-gray-700 text-gray-500">
+                          <FaUser className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium">{participant.name || participant.username}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

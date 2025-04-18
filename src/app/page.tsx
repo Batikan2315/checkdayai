@@ -495,11 +495,12 @@ export default function Home() {
                   key={plan._id}
                   id={plan._id}
                   title={plan.title || "İsimsiz Plan"}
-                  description={plan.description || "Açıklama yok"}
-                  imageUrl={plan.image}
-                  date={new Date(plan.startDate || Date.now())}
-                  location={plan.location || "Konum belirtilmemiş"}
+                  description={plan.description || ""}
+                  imageUrl={plan.imageUrl}
+                  date={new Date(plan.startDate)}
+                  location={plan.location || ""}
                   creator={plan.creator}
+                  plan={plan}
                 />
               ))}
             </div>
