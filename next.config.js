@@ -24,19 +24,11 @@ const nextConfig = {
       exclude: ['error', 'warn'],
     } : false,
   },
-  webpack: (config, { dev, isServer }) => {
+  webpack: (config, { dir, isServer }) => {
     // Hata ayıklama için modu kontrol edelim
-    console.log(`Webpack derleniyor: isServer=${isServer}, isDev=${dev}`);
-    
-    // Chunk oluşturmayı kontrol edelim. Vendor için en güvenli ayarları kullanalım.
-    // Problemi çözmek için tüm webpack paket bölme yapılandırmasını basitleştirelim
-    config.optimization.splitChunks = false;
-    config.optimization.runtimeChunk = false;
+    console.log(`Webpack derleniyor: isServer=${isServer}`);
 
-    if (!isServer) {
-      // İstemci tarafı ayarları
-      console.log("İstemci tarafı webpack yapılandırması uygulanıyor");
-    } else {
+    if (isServer) {
       console.log("Sunucu tarafı webpack yapılandırması uygulanıyor");
       
       // Sunucu tarafı için tüm client-side modülleri hariç tutalım
@@ -62,21 +54,22 @@ const nextConfig = {
         'utf-8-validate'
       ];
       
-      // Webpack'in node değerlendirmesini devre dışı bırakalım
-      config.resolve.alias = {
-        ...config.resolve.alias,
-      };
-      
-      // Çok daha agresif bir approach - externals'ı tamamen boş modüllerle değiştirelim
-      const originalExternals = Array.isArray(config.externals) ? config.externals : [];
-      
+      // Boş bir dummy module kullanarak sunucu tarafında hariç tutalım
+      // Yeni yaklaşım: path.resolve ile gerçek bir dosya yoluna işaret edelim
+      const path = require('path');
+      const dummyModulePath = path.resolve(dir, './node_modules/next/dist/server/future/route-modules/app-page/module.compiled.js');
+
+      // Tarayıcı modüllerini externals olarak tanımla
+      const prevExternals = config.externals || [];
       config.externals = [
-        ...originalExternals,
-        function({ context, request }, callback) {
+        ...prevExternals,
+        (opts) => {
+          const { context, request } = opts;
+          
           // Doğrudan socket.io ve ilgili paketleri kontrol et
           if (browserModules.some(mod => request === mod || request.startsWith(`${mod}/`))) {
-            console.log(`📋 Server bundle'dan çıkarılan modül: ${request}`);
-            return callback(null, `commonjs {}`);
+            console.log(`🔒 Server bundle dışında tutulan modül: ${request}`);
+            return "commonjs next/dist/server/future/route-modules/app-page/module.compiled.js";
           }
           
           // Tarayıcı API'lerine bağımlı paketleri kontrol et
@@ -85,25 +78,33 @@ const nextConfig = {
               request.includes('websocket') ||
               request.includes('ws') ||
               request.includes('browser')) {
-            console.log(`📋 Server bundle'dan içerik içeren modül çıkarıldı: ${request}`);
-            return callback(null, `commonjs {}`);
+            console.log(`🔒 Server bundle dışında tutulan içerik: ${request}`);
+            return "commonjs next/dist/server/future/route-modules/app-page/module.compiled.js";
           }
           
-          callback();
+          // Normale devam et
+          return undefined;
         }
       ];
-      
+            
       // Sunucu tarafında tarayıcı kodlarını kaldırmak için ek önlem
       config.plugins.push(
         new (require('webpack').DefinePlugin)({
-          'self': 'undefined',
-          'window': 'undefined',
-          'document': 'undefined',
-          'location': 'undefined',
-          'navigator': 'undefined'
+          'self': '({})',
+          'window': '({})',
+          'document': '({})',
+          'location': '({})',
+          'navigator': '({})'
         })
       );
+    } else {
+      // İstemci tarafı ayarları
+      console.log("İstemci tarafı webpack yapılandırması uygulanıyor");
     }
+    
+    // İki taraf için de chunk oluşturmayı kaldıralım
+    config.optimization.splitChunks = false;
+    config.optimization.runtimeChunk = false;
     
     // Tüm platformlar için temel modül şablonları ekleyelim
     config.resolve.fallback = {
