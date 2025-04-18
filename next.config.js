@@ -28,6 +28,11 @@ const nextConfig = {
     // Hata ayıklama için modu kontrol edelim
     console.log(`Webpack derleniyor: isServer=${isServer}, isDev=${dev}`);
     
+    // Chunk oluşturmayı kontrol edelim. Vendor için en güvenli ayarları kullanalım.
+    // Problemi çözmek için tüm webpack paket bölme yapılandırmasını basitleştirelim
+    config.optimization.splitChunks = false;
+    config.optimization.runtimeChunk = false;
+
     if (!isServer) {
       // İstemci tarafı ayarları
       console.log("İstemci tarafı webpack yapılandırması uygulanıyor");
@@ -57,43 +62,50 @@ const nextConfig = {
         'utf-8-validate'
       ];
       
-      // Boş shim modüllerini kullanacak özel çözüm
-      const shimContent = 
-        `module.exports = {}`;
-      
       // Webpack'in node değerlendirmesini devre dışı bırakalım
       config.resolve.alias = {
         ...config.resolve.alias,
       };
       
-      // Yeni bir yaklaşımla externals tanımlayalım
+      // Çok daha agresif bir approach - externals'ı tamamen boş modüllerle değiştirelim
+      const originalExternals = Array.isArray(config.externals) ? config.externals : [];
+      
       config.externals = [
-        ...(Array.isArray(config.externals) ? config.externals : []),
+        ...originalExternals,
         function({ context, request }, callback) {
-          // İstek içeren modül adını kontrol et
+          // Doğrudan socket.io ve ilgili paketleri kontrol et
           if (browserModules.some(mod => request === mod || request.startsWith(`${mod}/`))) {
             console.log(`📋 Server bundle'dan çıkarılan modül: ${request}`);
             return callback(null, `commonjs {}`);
           }
+          
+          // Tarayıcı API'lerine bağımlı paketleri kontrol et
+          if (request.includes('socket.io') || 
+              request.includes('engine.io') || 
+              request.includes('websocket') ||
+              request.includes('ws') ||
+              request.includes('browser')) {
+            console.log(`📋 Server bundle'dan içerik içeren modül çıkarıldı: ${request}`);
+            return callback(null, `commonjs {}`);
+          }
+          
           callback();
         }
       ];
+      
+      // Sunucu tarafında tarayıcı kodlarını kaldırmak için ek önlem
+      config.plugins.push(
+        new (require('webpack').DefinePlugin)({
+          'self': 'undefined',
+          'window': 'undefined',
+          'document': 'undefined',
+          'location': 'undefined',
+          'navigator': 'undefined'
+        })
+      );
     }
     
-    // Ek olarak, bölünmüş paketleme stratejisini basitleştirelim
-    config.optimization.splitChunks = {
-      chunks: 'all',
-      cacheGroups: {
-        vendor: {
-          name: 'vendor',
-          test: /[\\/]node_modules[\\/]/,
-          priority: 10,
-          reuseExistingChunk: true,
-        },
-      },
-    };
-    
-    // İstemci ve sunucu için aynı - boş shim modülleri ekle
+    // Tüm platformlar için temel modül şablonları ekleyelim
     config.resolve.fallback = {
       ...(config.resolve.fallback || {}),
       fs: false,
@@ -105,7 +117,7 @@ const nextConfig = {
       'stream': false,
       'crypto': false,
       
-      // 'self' içeren modüller için özel bir çözüm
+      // Tarayıcı özel nesneler için boş modül kullan
       'self': false,
       'window': false,
       'document': false,

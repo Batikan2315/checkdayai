@@ -17,12 +17,8 @@ interface Socket {
   io: any;
 }
 
-// Socket.IO Client global tanımı
-declare global {
-  interface Window {
-    io: (url: string, options: any) => Socket;
-  }
-}
+// Tarayıcı-özel kodları ayır
+const isBrowser = typeof window !== 'undefined';
 
 interface Props {
   session: any;
@@ -32,9 +28,9 @@ export default function DynamicSocketHandler({ session }: Props) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [socketScriptLoaded, setSocketScriptLoaded] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<any>(null);
   const retryCountRef = useRef(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<any>(null);
   
   // Socket.IO script yüklenince
   const handleSocketScriptLoad = () => {
@@ -44,8 +40,11 @@ export default function DynamicSocketHandler({ session }: Props) {
   
   // Socket bağlantısı kurma
   const connect = () => {
+    // Tarayıcıda değilsek çık
+    if (!isBrowser) return;
+    
     // Socket.IO script yüklü değilse çık
-    if (!socketScriptLoaded || typeof window.io !== 'function') {
+    if (!socketScriptLoaded || !window.io) {
       console.log('Socket.IO script henüz yüklenmedi');
       return;
     }
@@ -61,7 +60,8 @@ export default function DynamicSocketHandler({ session }: Props) {
     
     try {
       // Yeni socket bağlantısı oluştur
-      const socket = window.io(window.location.origin, {
+      const io = window.io;
+      const socket = io(window.location.origin, {
         path: '/api/socketio',
         transports: ['polling'],
         reconnection: false,
@@ -155,6 +155,7 @@ export default function DynamicSocketHandler({ session }: Props) {
   
   // Bildirimleri alma
   const fetchNotifications = async () => {
+    if (!isBrowser) return;
     try {
       const response = await fetch('/api/notifications');
       if (!response.ok) {
@@ -168,6 +169,7 @@ export default function DynamicSocketHandler({ session }: Props) {
   
   // Manuel yeniden bağlanma
   const reconnect = () => {
+    if (!isBrowser) return;
     toast.loading('Sunucuya yeniden bağlanılıyor...', {
       id: 'reconnect-toast',
       duration: 3000,
@@ -197,6 +199,8 @@ export default function DynamicSocketHandler({ session }: Props) {
   
   // Sayfa görünürlüğünü izle
   useEffect(() => {
+    if (!isBrowser) return;
+    
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !isConnected && session?.user) {
         connect();
@@ -209,6 +213,11 @@ export default function DynamicSocketHandler({ session }: Props) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isConnected, session]);
+  
+  // Sunucu tarafında boş döndür
+  if (!isBrowser) {
+    return null;
+  }
   
   return (
     <>
