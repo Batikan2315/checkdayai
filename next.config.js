@@ -18,112 +18,31 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  productionBrowserSourceMaps: process.env.NODE_ENV !== 'production',
-  compiler: {
-    removeConsole: process.env.NODE_ENV === 'production' ? {
-      exclude: ['error', 'warn'],
-    } : false,
-  },
-  webpack: (config, { dir, isServer }) => {
-    // Hata ayıklama için modu kontrol edelim
-    console.log(`Webpack derleniyor: isServer=${isServer}`);
-
+  productionBrowserSourceMaps: false,
+  // Basitleştirilmiş webpack yapılandırması
+  webpack: (config, { isServer }) => {
     if (isServer) {
-      console.log("Sunucu tarafı webpack yapılandırması uygulanıyor");
+      console.log("Sunucu taraflı webpack yapılandırması uygulanıyor");
       
-      // Sunucu tarafı için tüm client-side modülleri hariç tutalım
-      const browserModules = [
-        'socket.io-client', 
-        'socket.io-parser',
-        'engine.io-client',
-        'engine.io-parser',
-        'debug',
-        'sockjs-client',
-        'ws',
-        'xmlhttprequest-ssl',
-        'component-emitter',
-        'backo2',
-        'parseqs',
-        'isomorphic-ws',
-        'base64-arraybuffer',
-        'yeast',
-        'has-cors',
-        'blob',
-        '@socket.io',
-        'bufferutil',
-        'utf-8-validate'
-      ];
+      // Tarayıcı modüllerini sunucu tarafında dışarda bırak
+      const originalExternals = config.externals;
       
-      // Boş bir dummy module kullanarak sunucu tarafında hariç tutalım
-      // Yeni yaklaşım: path.resolve ile gerçek bir dosya yoluna işaret edelim
-      const path = require('path');
-      const dummyModulePath = path.resolve(dir, './node_modules/next/dist/server/future/route-modules/app-page/module.compiled.js');
-
-      // Tarayıcı modüllerini externals olarak tanımla
-      const prevExternals = config.externals || [];
       config.externals = [
-        ...prevExternals,
-        (opts) => {
-          const { context, request } = opts;
-          
-          // Doğrudan socket.io ve ilgili paketleri kontrol et
-          if (browserModules.some(mod => request === mod || request.startsWith(`${mod}/`))) {
-            console.log(`🔒 Server bundle dışında tutulan modül: ${request}`);
-            return "commonjs next/dist/server/future/route-modules/app-page/module.compiled.js";
-          }
-          
-          // Tarayıcı API'lerine bağımlı paketleri kontrol et
-          if (request.includes('socket.io') || 
-              request.includes('engine.io') || 
-              request.includes('websocket') ||
-              request.includes('ws') ||
-              request.includes('browser')) {
-            console.log(`🔒 Server bundle dışında tutulan içerik: ${request}`);
-            return "commonjs next/dist/server/future/route-modules/app-page/module.compiled.js";
-          }
-          
-          // Normale devam et
-          return undefined;
+        ...(Array.isArray(originalExternals) ? originalExternals : [originalExternals].filter(Boolean)),
+        {
+          'socket.io-client': 'commonjs socket.io-client',
+          'engine.io-client': 'commonjs engine.io-client',
         }
       ];
-            
-      // Sunucu tarafında tarayıcı kodlarını kaldırmak için ek önlem
-      config.plugins.push(
-        new (require('webpack').DefinePlugin)({
-          'self': '({})',
-          'window': '({})',
-          'document': '({})',
-          'location': '({})',
-          'navigator': '({})'
-        })
-      );
-    } else {
-      // İstemci tarafı ayarları
-      console.log("İstemci tarafı webpack yapılandırması uygulanıyor");
     }
     
-    // İki taraf için de chunk oluşturmayı kaldıralım
-    config.optimization.splitChunks = false;
-    config.optimization.runtimeChunk = false;
-    
-    // Tüm platformlar için temel modül şablonları ekleyelim
+    // Temel fallback ayarları
     config.resolve.fallback = {
       ...(config.resolve.fallback || {}),
       fs: false,
       net: false,
       tls: false,
       dns: false,
-      'perf_hooks': false,
-      child_process: false,
-      'stream': false,
-      'crypto': false,
-      
-      // Tarayıcı özel nesneler için boş modül kullan
-      'self': false,
-      'window': false,
-      'document': false,
-      'location': false,
-      'navigator': false,
     };
     
     return config;
