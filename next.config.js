@@ -10,7 +10,7 @@ const nextConfig = {
   experimental: {
     scrollRestoration: true,
     optimizeCss: true,
-    optimizeServerReact: true,
+    optimizeServerReact: false,
   },
   eslint: {
     ignoreDuringBuilds: true,
@@ -25,42 +25,25 @@ const nextConfig = {
     } : false,
   },
   webpack: (config, { dev, isServer }) => {
-    // Kod bölme ve yükleme optimizasyonları
-    config.optimization.splitChunks = {
-      chunks: 'all',
-      cacheGroups: {
-        vendor: {
-          test: /[\\/]node_modules[\\/]/,
-          name(module) {
-            const match = module.context?.match(/[\\/]node_modules[\\/](.*?)([\\/]|$)/);
-            const packageName = match ? match[1] : 'vendor';
-            return `npm.${packageName.replace('@', '')}`;
-          },
-          priority: 10,
-          reuseExistingChunk: true,
-        },
-        common: {
-          test: /[\\/]src[\\/]components[\\/]/,
-          name: 'common-components',
-          minChunks: 2,
-          priority: 5,
-          reuseExistingChunk: true,
-        },
-      },
-    };
-
-    // İstemci ve sunucu tarafı ayrımı için
-    if (isServer) {
-      // Sunucu taraflı bundle'a girmemesi gereken modüller
+    // Hata ayıklama için modu kontrol edelim
+    console.log(`Webpack derleniyor: isServer=${isServer}, isDev=${dev}`);
+    
+    if (!isServer) {
+      // İstemci tarafı ayarları
+      console.log("İstemci tarafı webpack yapılandırması uygulanıyor");
+    } else {
+      console.log("Sunucu tarafı webpack yapılandırması uygulanıyor");
+      
+      // Sunucu tarafı için tüm client-side modülleri hariç tutalım
       const browserModules = [
         'socket.io-client', 
+        'socket.io-parser',
         'engine.io-client',
         'engine.io-parser',
-        'socket.io-parser',
         'debug',
         'sockjs-client',
-        'xmlhttprequest-ssl',
         'ws',
+        'xmlhttprequest-ssl',
         'component-emitter',
         'backo2',
         'parseqs',
@@ -68,43 +51,68 @@ const nextConfig = {
         'base64-arraybuffer',
         'yeast',
         'has-cors',
-        'blob'
+        'blob',
+        '@socket.io',
+        'bufferutil',
+        'utf-8-validate'
       ];
       
-      // external fonksiyonunu güncelleyelim
-      const originalExternals = [...(config.externals || [])];
+      // Boş shim modüllerini kullanacak özel çözüm
+      const shimContent = 
+        `module.exports = {}`;
       
+      // Webpack'in node değerlendirmesini devre dışı bırakalım
+      config.resolve.alias = {
+        ...config.resolve.alias,
+      };
+      
+      // Yeni bir yaklaşımla externals tanımlayalım
       config.externals = [
-        ...originalExternals,
-        ({ context, request }, callback) => {
-          // Doğrudan modül isimlerini kontrol et
-          if (browserModules.includes(request)) {
-            return callback(null, 'commonjs ' + request);
+        ...(Array.isArray(config.externals) ? config.externals : []),
+        function({ context, request }, callback) {
+          // İstek içeren modül adını kontrol et
+          if (browserModules.some(mod => request === mod || request.startsWith(`${mod}/`))) {
+            console.log(`📋 Server bundle'dan çıkarılan modül: ${request}`);
+            return callback(null, `commonjs {}`);
           }
-          
-          // Modül yolu içinde geçen tarayıcı modüllerini kontrol et
-          if (browserModules.some(mod => request.includes(mod))) {
-            return callback(null, 'commonjs ' + request);
-          }
-          
-          // Normal işleme devam et
           callback();
         }
       ];
     }
-
-    // Tüm platformlarda boş modül şablonları ekleyelim
+    
+    // Ek olarak, bölünmüş paketleme stratejisini basitleştirelim
+    config.optimization.splitChunks = {
+      chunks: 'all',
+      cacheGroups: {
+        vendor: {
+          name: 'vendor',
+          test: /[\\/]node_modules[\\/]/,
+          priority: 10,
+          reuseExistingChunk: true,
+        },
+      },
+    };
+    
+    // İstemci ve sunucu için aynı - boş shim modülleri ekle
     config.resolve.fallback = {
-      ...config.resolve.fallback,
+      ...(config.resolve.fallback || {}),
       fs: false,
       net: false,
       tls: false,
       dns: false,
-      "perf_hooks": false,
-      // Tarayıcı özel nesneler için shim ekleyelim
-      "self": false
+      'perf_hooks': false,
+      child_process: false,
+      'stream': false,
+      'crypto': false,
+      
+      // 'self' içeren modüller için özel bir çözüm
+      'self': false,
+      'window': false,
+      'document': false,
+      'location': false,
+      'navigator': false,
     };
-
+    
     return config;
   },
   async headers() {
