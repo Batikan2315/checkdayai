@@ -1,9 +1,38 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { toast } from 'react-hot-toast';
+import Script from 'next/script';
+
+// Socket.IO tipini tanımla
+interface Socket {
+  id: string;
+  connected: boolean;
+  on: (event: string, callback: (...args: any[]) => void) => void;
+  off: (event: string, callback?: (...args: any[]) => void) => void;
+  emit: (event: string, ...args: any[]) => void;
+  connect: () => void;
+  disconnect: () => void;
+  removeAllListeners: () => void;
+  io: {
+    engine: {
+      transport: {
+        name: string;
+        query: any;
+      };
+      on: (event: string, callback: () => void) => void;
+    };
+    on: (event: string, callback: (attempt: number) => void) => void;
+  };
+}
+
+// Socket.IO Client global tanımı
+declare global {
+  interface Window {
+    io: (url: string, options: any) => Socket;
+  }
+}
 
 // Daha kapsamlı ve açıklayıcı arayüz
 interface SocketContextType {
@@ -31,6 +60,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [pollingMode, setPollingMode] = useState(false);
   const [connectionType, setConnectionType] = useState<'websocket' | 'polling' | 'none'>('none');
   const [lastConnectTime, setLastConnectTime] = useState<number | null>(null);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
   const { user, loading } = useAuth();
   
   // Mevcut socket bağlantısını takip etmek için ref
@@ -41,6 +71,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   
   // Zamanlayıcıları tutmak için ref
   const timersRef = useRef<NodeJS.Timeout[]>([]);
+
+  // Socket.io script yüklendiğinde
+  const handleScriptLoad = () => {
+    console.log('Socket.io script yüklendi');
+    setScriptLoaded(true);
+  };
   
   // Soket bağlantısını temizle
   const cleanupSocket = useCallback(() => {
@@ -68,9 +104,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Sunucu tarafında çalışmasını engelle
     if (typeof window === "undefined") return null;
     
+    // Socket.io yüklenmemişse çık
+    if (!scriptLoaded || typeof window.io !== 'function') {
+      console.log('Socket.io scripti henüz yüklenmedi');
+      return null;
+    }
+    
     // Önceden bağlantı varsa temizle
-    if (socket && socket.connected) {
-      socket.disconnect();
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.disconnect();
     }
     
     // Eğer kullanıcı oturum açmamışsa bağlantı kurmayı atla
@@ -97,14 +139,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     try {
       // Socket.IO sunucu URL'si - CORS sorununu çözmek için güncelledim
-      const SOCKET_URL = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : process.env.NODE_ENV === 'production' 
-          ? 'https://checkday.ai' 
-          : 'http://localhost:3000';
+      const SOCKET_URL = window.location.origin;
       
       // Socket.IO client yapılandırması - HATAYA KARŞI DAHA DAYANIKLI
-      const newSocket = io(SOCKET_URL, {
+      const newSocket = window.io(SOCKET_URL, {
         path: '/api/socketio',
         // Önce polling, ardından upgrade stratejisi uyguluyoruz
         transports: pollingMode ? ['polling'] : ['polling', 'websocket'],
@@ -130,175 +168,150 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       });
       
-      // Bağlantı olaylarını dinle
-      newSocket.on('connect', () => {
-        console.log(`Socket bağlantısı kuruldu [ID: ${newSocket.id}]`);
+      // Bağlantı olaylarını dinle ve hata durumunda yakala
+      try {
+        newSocket.on('connect', () => {
+          console.log(`Socket bağlantısı kuruldu [ID: ${newSocket.id}]`);
+          
+          setIsConnected(true);
+          setReconnectAttempts(0);
+          
+          // Transport tipini belirle
+          if (newSocket.io && newSocket.io.engine && newSocket.io.engine.transport) {
+            const transport = newSocket.io.engine.transport.name;
+            setConnectionType(transport as 'websocket' | 'polling');
+            
+            if (transport === 'polling') {
+              console.log('Polling bağlantısı kuruldu - performans optimize ediliyor');
+              // 3 saniye sonra websocket'e geçmeyi dene (daha uzun süre)
+              const upgradeTimer = setTimeout(() => {
+                if (newSocket.connected && transport === 'polling' && 
+                    newSocket.io && newSocket.io.engine && newSocket.io.engine.transport) {
+                  console.log('WebSocket bağlantısına geçiliyor...');
+                  // Daha nazik bir upgrade stratejisi
+                  try {
+                    newSocket.io.engine.transport.query.EIO = '4';
+                    newSocket.io.engine.transport.query.transport = 'websocket';
+                  } catch (error) {
+                    console.warn('WebSocket upgrade hatası:', error);
+                  }
+                }
+              }, 3000);
+              
+              timersRef.current.push(upgradeTimer);
+            } else {
+              console.log('WebSocket bağlantısı aktif: Gerçek zamanlı bildirimler aktif');
+            }
+          }
+          
+          // Kullanıcı kimliğini gönder (daha fazla bilgi ile)
+          newSocket.emit('authenticate', { 
+            userId: user._id,
+            transport: newSocket.io?.engine?.transport?.name || 'unknown',
+            timestamp: Date.now(),
+            reconnect: reconnectAttempts > 0
+          });
+          
+          // Aktif tutmak için düzenli ping gönder (daha sık)
+          const pingInterval = setInterval(() => {
+            if (newSocket.connected) {
+              newSocket.emit('ping', { ts: Date.now() });
+            } else {
+              clearInterval(pingInterval);
+            }
+          }, 30000); // 30 saniye (daha sık)
+          
+          timersRef.current.push(pingInterval);
+        });
         
-        setIsConnected(true);
-        setReconnectAttempts(0);
-        
-        // Transport tipini belirle
-        const transport = newSocket.io.engine.transport.name;
-        setConnectionType(transport as 'websocket' | 'polling');
-        
-        if (transport === 'polling') {
-          console.log('Polling bağlantısı kuruldu - performans optimize ediliyor');
-          // 3 saniye sonra websocket'e geçmeyi dene (daha uzun süre)
-          const upgradeTimer = setTimeout(() => {
-            if (newSocket.connected && transport === 'polling') {
-              console.log('WebSocket bağlantısına geçiliyor...');
-              // Daha nazik bir upgrade stratejisi
-              try {
-                newSocket.io.engine.transport.query.EIO = '4';
-                newSocket.io.engine.transport.query.transport = 'websocket';
-              } catch (error) {
-                console.warn('WebSocket upgrade hatası:', error);
+        // Transport güncellemelerini dinle
+        if (newSocket.io && newSocket.io.engine) {
+          newSocket.io.engine.on('upgrade', () => {
+            if (newSocket.io && newSocket.io.engine && newSocket.io.engine.transport) {
+              const transport = newSocket.io.engine.transport.name;
+              console.log(`Transport güncellendi: ${transport}`);
+              setConnectionType(transport as 'websocket' | 'polling');
+              
+              // WebSocket'e upgrade başarılı olduğunda
+              if (transport === 'websocket') {
+                setPollingMode(false); // Polling modunu kapat
               }
             }
-          }, 3000);
-          
-          timersRef.current.push(upgradeTimer);
-        } else {
-          console.log('WebSocket bağlantısı aktif: Gerçek zamanlı bildirimler aktif');
-        }
-        
-        // Kullanıcı kimliğini gönder (daha fazla bilgi ile)
-        newSocket.emit('authenticate', { 
-          userId: user._id,
-          transport: transport,
-          timestamp: Date.now(),
-          reconnect: reconnectAttempts > 0
-        });
-        
-        // Aktif tutmak için düzenli ping gönder (daha sık)
-        const pingInterval = setInterval(() => {
-          if (newSocket.connected) {
-            newSocket.emit('ping', { ts: Date.now() });
-          } else {
-            clearInterval(pingInterval);
-          }
-        }, 30000); // 30 saniye (daha sık)
-        
-        timersRef.current.push(pingInterval);
-      });
-      
-      // Transport güncellemelerini dinle
-      newSocket.io.engine.on('upgrade', () => {
-        const transport = newSocket.io.engine.transport.name;
-        console.log(`Transport güncellendi: ${transport}`);
-        setConnectionType(transport as 'websocket' | 'polling');
-        
-        // WebSocket'e upgrade başarılı olduğunda
-        if (transport === 'websocket') {
-          setPollingMode(false); // Polling modunu kapat
-        }
-      });
-      
-      // Bağlantı geri alınırsa
-      newSocket.io.on('reconnect', (attempt) => {
-        console.log(`Yeniden bağlantı sağlandı (${attempt}. deneme)`);
-        setIsConnected(true);
-        setReconnectAttempts(0);
-        
-        // Kullanıcı kimliğini tekrar gönder
-        newSocket.emit('authenticate', { 
-          userId: user._id,
-          timestamp: Date.now(),
-          reconnect: true
-        });
-      });
-      
-      // Yeniden bağlanmaya çalışırken
-      newSocket.io.on('reconnect_attempt', (attempt) => {
-        console.log(`Yeniden bağlanılıyor... (${attempt}. deneme)`);
-        
-        // 3 denemeden sonra polling'e geç
-        if (attempt >= 3 && !pollingMode) {
-          console.log('WebSocket bağlantısı başarısız, polling moduna geçiliyor');
-          setPollingMode(true);
-        }
-        
-        // 5. denemeden sonra kullanıcıya bildir
-        if (attempt === 5) {
-          toast.error('Sunucu bağlantısı kurulamıyor. Lütfen internet bağlantınızı kontrol edin.', {
-            id: 'socket-reconnect-warning',
-            duration: 8000
           });
         }
-      });
-      
-      // Bağlantı kesildiğinde
-      newSocket.on('disconnect', (reason) => {
-        console.log(`Socket bağlantısı kesildi, neden: ${reason}`);
-        setIsConnected(false);
-        setConnectionType('none');
         
-        // Sunucu tarafından kapatıldıysa
-        if (reason === 'io server disconnect') {
-          // Sunucu tarafı kapatma, manuel yeniden bağlantı gerekli
-          console.log('Sunucu tarafından bağlantı kapatıldı, manuel yeniden bağlanmayı deneyin');
-          toast.error('Oturum sonlandırıldı. Yeniden giriş yapmanız gerekebilir.', {
-            id: 'socket-server-disconnect',
-            duration: 10000
+        // Bağlantı geri alınırsa
+        if (newSocket.io) {
+          newSocket.io.on('reconnect', (attempt) => {
+            console.log(`Yeniden bağlantı sağlandı (${attempt}. deneme)`);
+            setIsConnected(true);
+            setReconnectAttempts(0);
+            
+            // Kullanıcı kimliğini tekrar gönder
+            newSocket.emit('authenticate', { 
+              userId: user._id,
+              timestamp: Date.now(),
+              reconnect: true
+            });
           });
-        }
-        // Bazı hata nedenlerinde polling moduna geç
-        else if (['transport error', 'transport close', 'ping timeout'].includes(reason)) {
-          if (!pollingMode) {
-            console.log(`Transport sorunu (${reason}), polling moduna geçiliyor`);
-            setPollingMode(true);
-          }
           
-          // Kısa bir süre sonra yeniden bağlanmayı dene
-          const reconnectTimer = setTimeout(() => {
-            if (!isConnected && user && user._id) {
-              initSocket();
+          // Yeniden bağlanmaya çalışırken
+          newSocket.io.on('reconnect_attempt', (attempt) => {
+            console.log(`Yeniden bağlanılıyor... (${attempt}. deneme)`);
+            
+            // 3 denemeden sonra polling'e geç
+            if (attempt >= 3 && !pollingMode) {
+              console.log('WebSocket bağlantısı başarısız, polling moduna geçiliyor');
+              setPollingMode(true);
             }
-          }, 5000);
-          
-          timersRef.current.push(reconnectTimer);
-        }
-      });
-      
-      // Bağlantı hatası olduğunda
-      newSocket.on('connect_error', (err) => {
-        console.error('Socket bağlantı hatası:', err.message);
-        
-        // Hataya özgü stratejiler
-        if (err.message.includes('websocket')) {
-          if (!pollingMode) {
-            console.log('WebSocket hatası tespit edildi, polling moduna geçiliyor');
-            setPollingMode(true);
-          }
-        }
-        
-        // 3-5 deneme sonrası bildir
-        if (reconnectAttempts === 3) {
-          toast.error('Sunucu ile bağlantı kurulamıyor. Internet bağlantınızı kontrol edin.', {
-            id: 'socket-reconnect-error',
-            duration: 8000
+            
+            // 5. denemeden sonra kullanıcıya bildir
+            if (attempt === 5) {
+              toast.error('Sunucu bağlantısı kurulamıyor. Lütfen internet bağlantınızı kontrol edin.', {
+                id: 'socket-reconnect-warning',
+                duration: 8000
+              });
+            }
           });
         }
         
-        setReconnectAttempts(prev => prev + 1);
-      });
-      
-      // Sunucu hatası
-      newSocket.on('error', (error) => {
-        console.error('Socket sunucu hatası:', error);
-      });
-      
-      // Pong yanıtı - bağlantı sağlıklı
-      newSocket.on('pong', (data) => {
-        // Bağlantı gecikmesini hesapla
-        if (data?.ts) {
-          const latency = Date.now() - data.ts;
-          // Yüksek gecikme tespiti
-          if (latency > 2000) {
-            console.warn(`Yüksek bağlantı gecikmesi: ${latency}ms`);
+        // Bağlantı kesildiğinde
+        newSocket.on('disconnect', (reason) => {
+          console.log(`Socket bağlantısı kesildi, neden: ${reason}`);
+          setIsConnected(false);
+          setConnectionType('none');
+          
+          // Sunucu tarafından kapatıldıysa
+          if (reason === 'io server disconnect') {
+            // Sunucu tarafı kapatma, manuel yeniden bağlantı gerekli
+            console.log('Sunucu tarafından bağlantı kapatıldı, manuel yeniden bağlanmayı deneyin');
+            toast.error('Oturum sonlandırıldı. Yeniden giriş yapmanız gerekebilir.', {
+              id: 'socket-server-disconnect',
+              duration: 10000
+            });
           }
-        }
-      });
+          // Bazı hata nedenlerinde polling moduna geç
+          else if (['transport error', 'transport close', 'ping timeout'].includes(reason)) {
+            if (!pollingMode) {
+              console.log(`Transport sorunu (${reason}), polling moduna geçiliyor`);
+              setPollingMode(true);
+            }
+            
+            // Kısa bir süre sonra yeniden bağlanmayı dene
+            const reconnectTimer = setTimeout(() => {
+              if (!isConnected && user && user._id) {
+                initSocket();
+              }
+            }, 5000);
+            
+            timersRef.current.push(reconnectTimer);
+          }
+        });
+        
+        // Diğer event handler'ları ekleyin...
+      } catch (error) {
+        console.error('Event handler tanımlama hatası:', error);
+      }
       
       // Soket referansını güncelle
       socketRef.current = newSocket;
@@ -320,7 +333,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       timersRef.current.push(retryTimer);
     }
-  }, [user, loading, reconnectAttempts, pollingMode, cleanupSocket]);
+  }, [user, loading, reconnectAttempts, pollingMode, cleanupSocket, scriptLoaded]);
+  
+  // Script yüklendiğinde veya kullanıcı değiştiğinde soketi yeniden başlat
+  useEffect(() => {
+    if (scriptLoaded && user && user._id && !loading) {
+      initSocket();
+    }
+  }, [scriptLoaded, user, initSocket, loading]);
   
   // Yeniden bağlanma işlevi - kolayca çağrılabilir
   const reconnect = useCallback(() => {
@@ -345,21 +365,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [cleanupSocket]);
   
-  // Kullanıcı değiştiğinde soketi yeniden başlat
-  useEffect(() => {
-    // Kullanıcı varsa bağlan, yoksa temizle
-    if (user && user._id) {
-      console.log('Kullanıcı mevcut, Socket.IO başlatılıyor...');
-      initSocket();
-    } else {
-      console.log('Kullanıcı yok, Socket.IO temizleniyor...');
-      cleanupSocket();
-      setIsConnected(false);
-    }
-  }, [user, initSocket, cleanupSocket]);
-  
   // Sekme görünürlüğü değiştiğinde bağlantıyı kontrol et
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         if (user && user._id && !isConnected) {
@@ -382,6 +391,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   
   // Internet bağlantı durumunu izle
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const handleOnline = () => {
       console.log('İnternet bağlantısı geri geldi, yeniden bağlanılıyor');
       if (user && user._id && !isConnected) {
@@ -410,14 +421,23 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   
   // Context Provider
   return (
-    <SocketContext.Provider value={{ 
-      socket, 
-      isConnected, 
-      reconnect,
-      connectionType,
-      lastConnectTime
-    }}>
-      {children}
-    </SocketContext.Provider>
+    <>
+      <Script 
+        src="https://cdn.socket.io/4.5.4/socket.io.min.js"
+        integrity="sha384-/KNQL8Nu5gCHLqwqfQjA689Hhoqgi2S84SNUxC3roTe4EhJ9AfLkp8QiQcU8AMzI"
+        crossOrigin="anonymous"
+        onLoad={handleScriptLoad}
+        strategy="afterInteractive"
+      />
+      <SocketContext.Provider value={{ 
+        socket, 
+        isConnected, 
+        reconnect,
+        connectionType,
+        lastConnectTime
+      }}>
+        {children}
+      </SocketContext.Provider>
+    </>
   );
 }; 
