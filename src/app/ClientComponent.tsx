@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import ClientSocketHandler from "@/components/ClientSocketHandler";
 
 export default function ClientComponent() {
   const { user, loading } = useAuth();
@@ -22,5 +23,50 @@ export default function ClientComponent() {
     }
   }, [user, loading, pathname, router]);
 
-  return null;
+  useEffect(() => {
+    // Sayfa yüklendikten sonra sağ tıklama ve F12 tuşunu devre dışı bırak
+    function blockContextMenu(e: any) {
+      e.preventDefault();
+    }
+    
+    function blockF12(e: any) {
+      if (e.keyCode === 123) {
+        e.preventDefault();
+      }
+    }
+    
+    // Etkinlikleri ekle
+    document.addEventListener("contextmenu", blockContextMenu);
+    document.addEventListener("keydown", blockF12);
+    
+    // İzleme kodu
+    const trackPageView = () => {
+      if (window.location.hostname === 'localhost') return;
+      
+      const url = window.location.href;
+      console.log(`Page view: ${url}`);
+      
+      // İstatistik gönderme 
+      try {
+        fetch('/api/analytics/pageview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, path: pathname })
+        });
+      } catch (error) {
+        console.error("Analitik verisi gönderilemedi", error);
+      }
+    };
+    
+    // Sayfa yüklendiğinde izle
+    trackPageView();
+    
+    // Temizleme
+    return () => {
+      document.removeEventListener("contextmenu", blockContextMenu);
+      document.removeEventListener("keydown", blockF12);
+    };
+  }, [pathname]);
+
+  return <ClientSocketHandler />;
 } 
