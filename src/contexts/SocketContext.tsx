@@ -90,10 +90,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     console.log('Socket.IO bağlantısı başlatılıyor...');
     
     try {
-      // Socket.IO sunucusunun URL'sini belirle
-      const SOCKET_URL = process.env.NODE_ENV === 'production' 
-        ? 'https://checkday.ai'
-        : window.location.origin;
+      // Socket.IO sunucu URL'si - CORS sorununu çözmek için güncelledim
+      const SOCKET_URL = typeof window !== 'undefined' 
+        ? window.location.origin 
+        : process.env.NODE_ENV === 'production' 
+          ? 'https://checkday.ai' 
+          : 'http://localhost:3000';
       
       // Socket.IO client yapılandırması - GÜÇLENDİRİLDİ
       const newSocket = io(SOCKET_URL, {

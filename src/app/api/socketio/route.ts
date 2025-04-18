@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { Socket } from "net";
 import { Server as SocketIOServer } from "socket.io";
 import { configureSocketServer } from "@/lib/socket";
+import { Server as NetServer } from 'http';
+import { getSession } from '@/lib/auth';
+import prisma from '@/lib/prisma';
 
 interface SocketServerIO extends Socket {
   server: {
@@ -15,12 +18,13 @@ let io: SocketIOServer | null = null;
 let connectionCount = 0;
 const MAX_CONNECTIONS = 1000;
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
-    // İstek origin bilgisini al
-    const origin = req.headers.get('origin') || '*';
     const isProd = process.env.NODE_ENV === 'production';
-
+    const origin = req.headers.get('origin') || '';
+    
     // İzin verilen originler
     const allowedOrigins = [
       "https://checkday.ai", 
@@ -28,9 +32,25 @@ export async function GET(req: NextRequest) {
       "http://localhost:3000"
     ];
     
+    // OPTIONS isteği için preflight yanıtı
+    if (req.method === 'OPTIONS') {
+      return new NextResponse(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': isProd 
+            ? '*'  // Tüm originlere izin ver
+            : '*',
+          'Access-Control-Allow-Methods': 'GET,OPTIONS,PATCH,DELETE,POST,PUT',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Credentials': 'true',
+          'Access-Control-Max-Age': '86400'
+        }
+      });
+    }
+
     // Gelen istek izin verilen origin mi kontrol et
     const corsOrigin = isProd 
-      ? allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
+      ? '*'  // Tüm originlere izin ver
       : "*";
     
     if (!io) {
