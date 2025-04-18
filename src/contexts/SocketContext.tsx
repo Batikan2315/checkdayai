@@ -91,7 +91,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     try {
       // Socket.IO sunucusunun URL'sini belirle
-      const SOCKET_URL = window.location.origin;
+      const SOCKET_URL = process.env.NODE_ENV === 'production' 
+        ? 'https://checkday.ai'
+        : window.location.origin;
       
       // Socket.IO client yapılandırması - GÜÇLENDİRİLDİ
       const newSocket = io(SOCKET_URL, {
@@ -99,10 +101,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // WebSocket hataları nedeniyle sadece polling kullanıyoruz
         transports: ['polling'],
         // Bağlantı ayarları - daha kararlı zaman aşımları
-        reconnectionAttempts: 3,
-        reconnectionDelay: 2000,
-        reconnectionDelayMax: 10000,
-        timeout: 20000,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 30000,
         // Bellek optimizasyonları
         autoConnect: true,
         forceNew: true,
