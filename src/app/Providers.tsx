@@ -12,7 +12,10 @@ export default function Providers({
   children: React.ReactNode;
 }) {
   return (
-    <SessionProvider>
+    <SessionProvider
+      refetchInterval={5 * 60} // 5 dakikada bir yenile
+      refetchOnWindowFocus={true} // Sekme aktif olduğunda yenile
+    >
       <ThemeProvider attribute="class" defaultTheme="light">
         <AuthProvider>
           <SocketProvider>

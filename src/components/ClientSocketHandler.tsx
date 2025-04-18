@@ -22,7 +22,7 @@ export default function ClientSocketHandler() {
   } = useSocket(session);
 
   const { 
-    bildirimleriGetir 
+    refreshNotifications 
   } = useNotifications(socket, session);
 
   // Oturum durumu değiştiğinde socket bağlantısını yönet
@@ -42,17 +42,20 @@ export default function ClientSocketHandler() {
   useEffect(() => {
     if (bağlantıDurumu === 'bağlandı') {
       // Bildirimleri getir
-      bildirimleriGetir();
+      refreshNotifications();
     } else if (bağlantıDurumu === 'hata' && bağlantıHatası) {
-      // Hata durumunda kullanıcıya bilgi ver (sadece kritik hatalarda)
-      if (!bağlantıHatası.includes('Yeniden bağlanılıyor')) {
-        toast.error('Sunucu bağlantısında sorun var. Otomatik yeniden bağlanmayı deniyoruz.', {
-          id: 'socket-error',
-          duration: 4000,
-        });
+      // Sadece oturum açık kullanıcılara hata mesajı göster
+      if (status === 'authenticated' && session?.user) {
+        // Hata durumunda kullanıcıya bilgi ver (sadece kritik hatalarda)
+        if (!bağlantıHatası.includes('Yeniden bağlanılıyor')) {
+          toast.error('Sunucu bağlantısında sorun var. Otomatik yeniden bağlanmayı deniyoruz.', {
+            id: 'socket-error',
+            duration: 4000,
+          });
+        }
       }
     }
-  }, [bağlantıDurumu, bağlantıHatası, bildirimleriGetir]);
+  }, [bağlantıDurumu, bağlantıHatası, refreshNotifications, status, session]);
 
   // Manuel yeniden bağlanma işlevi
   const manuelYenidenBağlan = () => {

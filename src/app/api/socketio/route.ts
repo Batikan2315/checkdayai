@@ -5,6 +5,7 @@ import { configureSocketServer } from "@/lib/socket";
 import { Server as NetServer } from 'http';
 import { getSession } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { randomUUID } from 'crypto';
 
 interface SocketServerIO extends Socket {
   server: {

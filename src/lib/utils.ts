@@ -2,6 +2,15 @@ import { format, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import { IPlan } from "./types";
 import { Types } from "mongoose";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+/**
+ * Tailwind sınıflarını birleştirmek için yardımcı fonksiyon
+ */
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 /**
  * Google ID veya MongoDB ObjectId güvenli şekilde kontrol eder ve dönüştürür

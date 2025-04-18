@@ -89,7 +89,7 @@ export default function PlanPage() {
         setLoading(false);
       }
     };
-    
+
     if (id) {
       loadPlan();
     }
@@ -198,7 +198,7 @@ export default function PlanPage() {
       toast.error("İşlem sırasında bir hata oluştu");
     }
   };
-  
+
   const handleShare = () => {
     shareContent({
       title: plan.title,
@@ -230,25 +230,25 @@ export default function PlanPage() {
         {plan?.likes?.length > 0 && <span className="text-xs">({plan.likes.length})</span>}
       </button>
       
-      <button 
+            <button 
         onClick={handleSavePlan}
         className={`px-4 py-2 ${hasSaved ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-md focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition-colors shadow-sm flex items-center justify-center gap-2`}
         disabled={loading}
       >
         {hasSaved ? <FaBookmark className="text-blue-500" /> : <FaRegBookmark />}
         {hasSaved ? 'Kaydedildi' : 'Kaydet'}
-      </button>
+            </button>
       
-      <button 
+            <button
         onClick={handleShare}
         className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-md focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition-colors shadow-sm flex items-center justify-center gap-2"
         disabled={loading}
-      >
+            >
         <FaShare /> Paylaş
-      </button>
-    </div>
+            </button>
+          </div>
   );
-  
+
   if (loading) {
     return <Loading />;
   }
@@ -256,7 +256,7 @@ export default function PlanPage() {
   if (!plan || error) {
     return <NotFound />;
   }
-  
+
   return (
     <PageContainer title={plan.title}>
       <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden">
@@ -282,13 +282,13 @@ export default function PlanPage() {
                   alt={plan.creator.name || "Kullanıcı"}
                   fill
                   className="object-cover"
-                />
-              ) : (
+            />
+          ) : (
                 <div className="flex items-center justify-center w-full h-full bg-gray-200 dark:bg-gray-700 text-gray-500">
                   <FaUser className="w-5 h-5" />
-                </div>
-              )}
             </div>
+          )}
+        </div>
             <div>
               <Link href={`/${plan.creator?.username}`} className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
                 {plan.creator?.name || plan.creator?.username}
@@ -323,9 +323,9 @@ export default function PlanPage() {
             {joinStatusMessage && (
               <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 p-3 rounded-md text-sm">
                 {joinStatusMessage}
-              </div>
-            )}
-            
+                </div>
+              )}
+              
             {/* Aksiyonlar */}
             {session && renderActionButtons()}
             
@@ -353,9 +353,9 @@ export default function PlanPage() {
                       ) : (
                         <div className="flex items-center justify-center w-full h-full bg-gray-200 dark:bg-gray-700 text-gray-500">
                           <FaUser className="w-4 h-4" />
-                        </div>
+            </div>
                       )}
-                    </div>
+                </div>
                     <div>
                       <p className="text-sm font-medium">{plan.creator.name || plan.creator.username}</p>
                       <span className="text-xs text-blue-600 dark:text-blue-400">Oluşturucu</span>
@@ -377,14 +377,14 @@ export default function PlanPage() {
                       ) : (
                         <div className="flex items-center justify-center w-full h-full bg-gray-200 dark:bg-gray-700 text-gray-500">
                           <FaUser className="w-4 h-4" />
-                        </div>
+                      </div>
                       )}
                     </div>
                     <p className="text-sm font-medium">{participant.name || participant.username}</p>
                   </Link>
                 ))}
-              </div>
-            </div>
+                    </div>
+                  </div>
           </div>
         </div>
       </div>

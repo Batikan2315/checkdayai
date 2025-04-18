@@ -157,6 +157,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user, getSession]);
 
+  // Önbellekten kullanıcı bilgilerini yükleme
+  const loadFromCache = () => {
+    try {
+      const cachedData = localStorage.getItem(USER_CACHE_KEY);
+      if (cachedData) {
+        const userData = JSON.parse(cachedData);
+        const expiry = userData._expiry || 0;
+        
+        // Önbellek süresi dolmadıysa kullan
+        if (expiry > Date.now()) {
+          delete userData._expiry;
+          return userData;
+        }
+      }
+    } catch (error) {
+      console.error('Önbellek yükleme hatası:', error);
+    }
+    return null;
+  };
+
+  // Oturum durumunu kontrol et
+  useEffect(() => {
+    if (status === 'loading') return;
+    
+    if (status === 'authenticated' && session) {
+      console.log('Oturum aktif, kullanıcı bilgileri alınıyor:', session.user?.email);
+      
+      const cachedUser = loadFromCache();
+      // Eğer önbellekte kullanıcı varsa ve oturum ID'leri eşleşiyorsa hemen kullan
+      if (cachedUser && cachedUser.id === session.user?.id) {
+        setUser(cachedUser);
+        setLoading(false);
+      } else {
+        // Aksi halde API'den kullanıcı bilgilerini al
+        refreshUserData(true);
+      }
+    } else if (status === 'unauthenticated') {
+      console.log('Oturum yok, kullanıcı temizleniyor');
+      setUser(null);
+      setLoading(false);
+      localStorage.removeItem(USER_CACHE_KEY);
+    }
+  }, [status, session, refreshUserData]);
+
   // Auth durumunu kontrol et
   const checkAuth = useCallback(async () => {
     try {
@@ -268,11 +312,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async () => {
     try {
       setLoading(true);
+      
+      // Eski oturum bilgilerini temizle
+      localStorage.removeItem(USER_CACHE_KEY);
+      sessionStorage.clear();
+      
+      // Tarayıcı önbelleğini zorla yenile
+      await signOut({ redirect: false });
+      
+      // Yeni oturum aç
       await signIn('google', { 
         callbackUrl: '/',
         redirect: true
       });
-      // signIn sonrası otomatik yönlendirme olduğundan burada özel bir şey yapmamıza gerek yok
+      
       return true;
     } catch (error) {
       console.error('Google girişi hatası:', error);
@@ -326,38 +379,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
   };
-  
-  // Uygulama yüklendikten sonra oturum kontrolü
-  useEffect(() => {
-    const handleSessionChange = async () => {
-      if (status === "authenticated" && session) {
-        // Session varsa kullanıcı bilgilerini getir
-        try {
-          await refreshUserData(true);
-          // Google ile ilgili ek log mesajını kaldır
-          const provider = session?.user?.provider || '';
-          if (provider === 'google') {
-            // Google ile giriş yapan kullanıcı için ek işlemler
-            // console.log('Google ile giriş yapıldı'); - Gereksiz log kaldırıldı
-          }
-        } catch (error) {
-          console.error('Kullanıcı bilgileri alınırken hata:', error);
-        }
-      } else if (status === "unauthenticated") {
-        // Session yoksa kullanıcıyı temizle
-        setUser(null);
-        localStorage.removeItem(USER_CACHE_KEY);
-      }
-      
-      // İlk yüklemeyi tamamla
-      setLoading(false);
-      setIsInitialized(true);
-    };
-    
-    if (status !== "loading") {
-      handleSessionChange();
-    }
-  }, [session, status, refreshUserData]);
   
   // Kullanıcı verilerinin güncelliğini korumak için periyodik kontrol
   useEffect(() => {

@@ -59,6 +59,11 @@ const useSocket = (session) => {
   // Socket bağlantısı kurma fonksiyonu
   const socketBağlantısıKur = useCallback((session) => {
     if (!session?.user || !bağlantıAktif.current) {
+      // Kullanıcı giriş yapmamışsa sessizce çık, hata gösterme
+      if (!session?.user) {
+        console.log('Kullanıcı giriş yapmamış, socket bağlantısı kurulmayacak');
+        return;
+      }
       return;
     }
 
@@ -120,6 +125,9 @@ const useSocket = (session) => {
         });
         
         yeniSocket.on('connect_error', (err) => {
+          // Kullanıcı giriş yapmamışsa hatayı sessizce görmezden gel
+          if (!session?.user) return;
+          
           console.error('Socket bağlantı hatası:', err.message);
           setBağlantıDurumu('hata');
           setBağlantıHatası(`${err.message}`);
@@ -129,7 +137,9 @@ const useSocket = (session) => {
           
           const yenidenDenemeSüresi = Math.min(30000, denemeSayısı.current * 2000);
           zamanlayıcı.current = setTimeout(() => {
-            socketBağlantısıKur(session);
+            if (session?.user) {  // Yeniden deneme öncesi kullanıcı kontrolü
+              socketBağlantısıKur(session);
+            }
           }, yenidenDenemeSüresi);
         });
         

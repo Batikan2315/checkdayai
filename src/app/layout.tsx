@@ -8,7 +8,10 @@ import Script from "next/script";
 import Navbar from "../components/layout/Navbar";
 import { FaInstagram, FaTwitter, FaLinkedin } from "react-icons/fa";
 import Link from "next/link";
-import { SocketProvider } from '@/contexts/SocketContext'
+import { ThemeProvider } from "next-themes";
+import { cn } from "@/lib/utils";
+import { fontSans } from "@/lib/fonts";
+import Loading from "@/components/Loading";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -34,9 +37,13 @@ export default function RootLayout({
         {/* Meta etiketleri */}
         <meta httpEquiv="Content-Security-Policy" content="upgrade-insecure-requests" />
       </head>
-      <body className={`${inter.className} h-full`}>
-        <Providers>
-          <SocketProvider>
+      <body className={cn("min-h-screen bg-background font-sans antialiased", fontSans.variable)}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+        >
+          <Providers>
             <Toaster position="top-center" reverseOrder={false} />
             <ClientComponent />
             <Navbar />
@@ -71,8 +78,8 @@ export default function RootLayout({
                 </div>
               </div>
             </footer>
-          </SocketProvider>
-        </Providers>
+          </Providers>
+        </ThemeProvider>
         <Script id="countdown-js" strategy="afterInteractive">
           {`
             document.addEventListener('DOMContentLoaded', function() {
@@ -129,6 +136,7 @@ export default function RootLayout({
             });
           `}
         </Script>
+        <Loading />
       </body>
     </html>
   );

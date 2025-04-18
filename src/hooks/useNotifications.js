@@ -13,7 +13,10 @@ export default function useNotifications(socket, session) {
   // Bildirimleri sunucudan alma
   const bildirimleriGetir = useCallback(async () => {
     // Oturum yoksa bildirimler alınmaz
-    if (!session?.user) return;
+    if (!session?.user) {
+      console.log('Bildirimler için oturum gerekli, istek yapılmıyor');
+      return;
+    }
     
     setYükleniyor(true);
     setHata(null);
@@ -27,20 +30,32 @@ export default function useNotifications(socket, session) {
       
       const data = await response.json();
       
+      // Veri kontrolü ve doğrulama
       if (Array.isArray(data)) {
         setBildirimler(data);
         const okunmamışlar = data.filter(bildirim => !bildirim.okundu).length;
         setOkunmamışSayısı(okunmamışlar);
       } else {
-        throw new Error('Geçersiz bildirim verisi');
+        console.log('Bildirim verisi dizi değil:', typeof data, data);
+        // Boş dizi olarak kabul et, hata mesajı gösterme
+        setBildirimler([]);
+        setOkunmamışSayısı(0);
       }
     } catch (error) {
       console.error('Bildirimler alınamadı:', error);
       setHata(error.message);
+      // Hata durumunda boş dizi kullan
+      setBildirimler([]);
+      setOkunmamışSayısı(0);
     } finally {
       setYükleniyor(false);
     }
   }, [session]);
+
+  // Bildirimleri yenileyen fonksiyon - dışarıdan erişilebilir
+  const refreshNotifications = useCallback(async () => {
+    return bildirimleriGetir();
+  }, [bildirimleriGetir]);
 
   // Bildirimi okundu olarak işaretleme
   const bildirimOkunduİşaretle = useCallback(async (bildirimId) => {
@@ -141,12 +156,13 @@ export default function useNotifications(socket, session) {
     
     // Yeni bildirim geldiğinde
     const yeniBildirimHandler = (yeniBildirim) => {
-      console.log('Yeni bildirim alındı:', yeniBildirim);
-      
-      if (!yeniBildirim || !yeniBildirim._id) {
-        console.error('Geçersiz bildirim formatı:', yeniBildirim);
+      // Veri kontrolü yap
+      if (!yeniBildirim || typeof yeniBildirim !== 'object' || !yeniBildirim._id) {
+        console.log('Geçersiz bildirim formatı, işlem yapılmıyor:', yeniBildirim);
         return;
       }
+      
+      console.log('Yeni bildirim alındı:', yeniBildirim);
       
       // Bildirimi listeye ekle
       setBildirimler(öncekiBildirimler => {
@@ -233,6 +249,7 @@ export default function useNotifications(socket, session) {
     bildirimOkunduİşaretle,
     tümBildirimleriOkunduYap,
     bildirimSil,
+    refreshNotifications,
     
     // Tip filtreleme yardımcıları
     sistemBildirimleri: bildirimler.filter(b => b.tip === 'sistem'),
