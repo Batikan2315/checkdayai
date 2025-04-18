@@ -1,13 +1,64 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { connectDB } from "@/lib/db";
 import User from "@/models/User";
+import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    }),
+    CredentialsProvider({
+      id: "credentials",
+      name: "E-posta ve Şifre",
+      credentials: {
+        email: { label: "E-posta", type: "email" },
+        password: { label: "Şifre", type: "password" }
+      },
+      async authorize(credentials) {
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            throw new Error("E-posta ve şifre gereklidir");
+          }
+          
+          await connectDB();
+          
+          // E-posta adresine göre kullanıcı kontrolü
+          const user = await User.findOne({ email: credentials.email }).select('+password');
+          
+          if (!user) {
+            throw new Error("Kullanıcı bulunamadı");
+          }
+          
+          // E-posta doğrulaması kontrolü
+          if (!user.isVerified) {
+            throw new Error("Lütfen önce e-posta adresinizi doğrulayın");
+          }
+          
+          // Şifre kontrolü
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+          
+          if (!isPasswordValid) {
+            throw new Error("Hatalı şifre");
+          }
+          
+          console.log(`Kullanıcı giriş yaptı: ${user.email}, Rol: ${user.role}`);
+          
+          return {
+            id: user._id.toString(),
+            email: user.email,
+            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.username,
+            image: user.profilePicture,
+            role: user.role
+          };
+        } catch (error: any) {
+          console.error("Giriş hatası:", error.message);
+          throw new Error(error.message || "Giriş yapılırken bir hata oluştu");
+        }
+      }
     })
   ],
   secret: process.env.JWT_SECRET,

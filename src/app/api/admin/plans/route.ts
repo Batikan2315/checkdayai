@@ -32,9 +32,10 @@ export async function GET(req: NextRequest) {
     // Veritabanına bağlan
     await connectDB();
     
-    // Planları getir
-    const plans = await Plan.find({})
-      .sort({ createdAt: -1 });
+    // Sadece giriş yapmış kullanıcının planlarını getir
+    const plans = await Plan.find({
+      creator: admin._id // Sadece admin'in oluşturduğu planlar
+    }).sort({ createdAt: -1 });
     
     // Plan oluşturucularının isimlerini ekle
     const plansWithCreatorNames = await Promise.all(
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
       })
     );
     
-    return NextResponse.json(plansWithCreatorNames);
+    return NextResponse.json({ plans: plansWithCreatorNames });
   } catch (error: any) {
     console.error("Plan listeleme hatası:", error);
     return NextResponse.json(

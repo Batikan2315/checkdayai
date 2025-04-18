@@ -31,7 +31,7 @@ export default function UserProfile() {
         console.log(`Parametre: ${usernameParam}, Temizlenmiş username: ${cleanUsername}`);
         
         // Geçersiz veya sistem sayfaları için önlem
-        if (cleanUsername === "giris" || cleanUsername === "login" || cleanUsername === "register") {
+        if (cleanUsername === "login" || cleanUsername === "register") {
           console.log("Geçersiz profil sayfası:", cleanUsername);
           setLoading(false);
           setUser(null);

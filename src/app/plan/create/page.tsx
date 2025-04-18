@@ -35,6 +35,25 @@ interface FormData {
   cancellationPolicy: string;
 }
 
+// Plan Verileri
+interface PlanData {
+  title: string;
+  description: string;
+  location: string;
+  isOnline: boolean;
+  isFree: boolean;
+  price: number;
+  startDate: string;
+  endDate: string;
+  maxParticipants: number;
+  isPrivate: boolean;
+  isPublic: boolean; // Herkese açık planlar için yeni alan 
+  allowInvites: boolean;
+  creator: string;
+  cancellationPolicy?: string;
+  imageUrl?: string;
+}
+
 export default function CreatePlan() {
   const router = useRouter();
   const { user } = useAuth();
@@ -307,35 +326,19 @@ export default function CreatePlan() {
         }
       }
       
-      // planData için interface tanımlayalım
-      interface PlanData {
-        title: string;
-        description: string;
-        location: string;
-        isOnline: boolean;
-        isFree: boolean;
-        price: number;
-        startDate: string;
-        endDate: string;
-        maxParticipants: number;
-        isPrivate: boolean;
-        allowInvites: boolean;
-        creator: string;
-        cancellationPolicy?: string;
-        imageUrl?: string;
-      }
-      
+      // API isteği için veri yapısını hazırla
       const planData: PlanData = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        location: formData.isOnline ? "Online Plan" : formData.location.trim(), 
+        title: formData.title,
+        description: formData.description,
+        location: formData.isOnline ? formData.onlineLink : formData.location,
         isOnline: formData.isOnline,
         isFree: formData.isFree,
-        price: formData.isFree ? 0 : parseFloat(formData.price.toString()),
+        price: formData.isFree ? 0 : formData.price,
         startDate: startDateTime.toISOString(),
         endDate: endDateTime.toISOString(),
-        maxParticipants: maxParticipants,
+        maxParticipants,
         isPrivate: formData.isPrivate,
+        isPublic: !formData.isPrivate, // Herkese açık planlar
         allowInvites: true,
         creator: userId,
       };
@@ -345,9 +348,9 @@ export default function CreatePlan() {
         planData.imageUrl = imageUrl;
       }
       
-      // İptal politikası ekle (sadece ücretli planlar için)
-      if (!formData.isFree && formData.cancellationPolicy) {
-        planData.cancellationPolicy = formData.cancellationPolicy.trim();
+      // İptal politikası
+      if (formData.cancellationRules) {
+        planData.cancellationPolicy = formData.cancellationPolicy;
       }
       
       console.log("Gönderilen veri:", planData);
@@ -409,85 +412,137 @@ export default function CreatePlan() {
 
   return (
     <PageContainer>
-      <Card>
-        <form onSubmit={handleSubmit}>
-          <CardBody className="space-y-6">
-            {/* Fotoğraf Yükleme */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Plan Fotoğrafı
-              </label>
-              <div 
-                className={`border-2 border-dashed rounded-lg p-4 text-center ${
-                  formData.imagePreview 
-                    ? "border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20" 
-                    : "border-gray-300 dark:border-gray-700"
-                }`}
-              >
-                {formData.imagePreview ? (
-                  <div className="relative">
-                    <img 
-                      src={formData.imagePreview} 
-                      alt="Yüklenen fotoğraf" 
-                      className="mx-auto h-64 object-cover rounded"
-                    />
-                    <button 
-                      type="button"
-                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
-                      onClick={() => setFormData({ ...formData, imageFile: null, imagePreview: undefined })}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <FaImage className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" />
-                    <div className="mt-2">
-                      <label htmlFor="image-upload" className="cursor-pointer text-blue-600 dark:text-blue-400 hover:underline">
-                        Fotoğraf Yükle
-                      </label>
-                      <input
-                        id="image-upload"
-                        name="image"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleImageChange}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      PNG, JPG, GIF (max. 2MB)
-                    </p>
-                  </div>
-                )}
+      <Card className="max-w-3xl mx-auto">
+        <CardHeader>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Yeni Plan Oluştur</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Arkadaşlarınızla buluşmak için yeni bir plan oluşturun.
+          </p>
+        </CardHeader>
+        
+        <CardBody>
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            {/* Temel Bilgiler */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium border-b pb-2">Temel Bilgiler</h3>
+              
+              {/* Başlık */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Başlık
+                </label>
+                <Input
+                  type="text"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  placeholder="Plan başlığı"
+                  required
+                />
               </div>
-            </div>
-            
-            {/* Başlık ve Açıklama */}
-            <div>
-              <Input
-                label="Başlık *"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                placeholder="Plan başlığı"
-                required
-                fullWidth
-              />
-            </div>
-            
-            <div>
-              <TextArea
-                label="Açıklama *"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Plan hakkında bilgiler..."
-                required
-                fullWidth
-              />
+              
+              {/* Açıklama */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Açıklama
+                </label>
+                <TextArea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Plan detayları"
+                  required
+                  rows={4}
+                />
+              </div>
+
+              {/* Plan Türü - Herkese Açık / Özel */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Plan Türü
+                </label>
+                <div className="flex flex-col gap-2 mt-2 border p-3 rounded-md bg-gray-50 dark:bg-gray-800">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      name="isPrivate" 
+                      id="planTypePublic"
+                      checked={!formData.isPrivate}
+                      onChange={() => handleChange('isPrivate', false)}
+                      className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <label htmlFor="planTypePublic" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">Herkese Açık Plan</span> - Herkes bu planı görebilir ve katılabilir
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      name="isPrivate"
+                      id="planTypePrivate"
+                      checked={formData.isPrivate}
+                      onChange={() => handleChange('isPrivate', true)}
+                      className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <label htmlFor="planTypePrivate" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">Özel Plan</span> - Sadece davet ettiğiniz kişiler görebilir
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fotoğraf Yükleme */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Plan Fotoğrafı
+                </label>
+                <div 
+                  className={`border-2 border-dashed rounded-lg p-4 text-center ${
+                    formData.imagePreview 
+                      ? "border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20" 
+                      : "border-gray-300 dark:border-gray-700"
+                  }`}
+                >
+                  {formData.imagePreview ? (
+                    <div className="relative">
+                      <img 
+                        src={formData.imagePreview} 
+                        alt="Yüklenen fotoğraf" 
+                        className="mx-auto h-64 object-cover rounded"
+                      />
+                      <button 
+                        type="button"
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                        onClick={() => setFormData({ ...formData, imageFile: null, imagePreview: undefined })}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <FaImage className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" />
+                      <div className="mt-2">
+                        <label htmlFor="image-upload" className="cursor-pointer text-blue-600 dark:text-blue-400 hover:underline">
+                          Fotoğraf Yükle
+                        </label>
+                        <input
+                          id="image-upload"
+                          name="image"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageChange}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        PNG, JPG, GIF (max. 2MB)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             
             {/* Tarih ve Saat */}
@@ -626,27 +681,6 @@ export default function CreatePlan() {
               )}
             </div>
             
-            {/* Plan Erişimi */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Plan Erişimi
-              </label>
-              <div className="flex items-center space-x-4 mb-2">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="isPrivate"
-                    checked={formData.isPrivate}
-                    onChange={handleChange}
-                    className="mr-2 h-4 w-4 text-blue-600"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Özel plan (Sadece davet edilenler katılabilir)
-                  </span>
-                </label>
-              </div>
-            </div>
-            
             {/* Katılımcı sayısı kontrolü */}
             <div className="mb-4">
               <label htmlFor="maxParticipants" className="block mb-2 text-sm font-medium text-gray-700">
@@ -723,24 +757,24 @@ export default function CreatePlan() {
                 </div>
               </div>
             )}
-          </CardBody>
-          
-          <CardFooter className="flex justify-end space-x-4 border-t border-gray-200 dark:border-gray-700 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-            >
-              İptal
-            </Button>
-            <Button
-              type="submit"
-              loading={loading}
-            >
-              Plan Oluştur
-            </Button>
-          </CardFooter>
-        </form>
+          </form>
+        </CardBody>
+        
+        <CardFooter className="flex justify-end space-x-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+          >
+            İptal
+          </Button>
+          <Button
+            type="submit"
+            loading={loading}
+          >
+            Plan Oluştur
+          </Button>
+        </CardFooter>
       </Card>
     </PageContainer>
   );

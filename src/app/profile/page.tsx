@@ -73,7 +73,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user && !authLoading) {
-      router.push("/giris");
+      router.push("/login");
     } else if (user) {
       // Google kullanıcısı kurulum ihtiyacına bakılır
       if ((user as any).needsSetup || (user.provider === 'google' && (!user.firstName || !user.lastName))) {
@@ -421,7 +421,7 @@ export default function Profile() {
             <h2 className="text-xl font-semibold mb-4">Oturum Açmanız Gerekiyor</h2>
             <p className="mb-6 text-gray-600">Bu sayfayı görüntülemek için lütfen giriş yapın.</p>
             <Button
-              onClick={() => router.push("/giris")}
+              onClick={() => router.push("/login")}
               fullWidth
             >
               Giriş Yap
@@ -895,35 +895,14 @@ export default function Profile() {
             {/* Sol menü */}
             <div className="w-full md:w-64 md:min-w-64 md:max-h-[calc(100vh-16rem)] sticky top-24">
               <Card className="overflow-hidden">
-                <CardHeader className="p-0">
-                  <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-24 relative">
-                    <div 
-                      className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 w-24 h-24 rounded-full border-4 border-white overflow-hidden bg-white cursor-pointer"
-                      onClick={handleProfilePictureClick}
-                    >
-                      <div className="relative w-full h-full">
-                        <img 
-                          src={user?.profilePicture || DEFAULT_AVATAR} 
-                          alt="Profil Fotoğrafı" 
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 flex items-center justify-center transition-all">
-                          <FaCamera className="text-white opacity-0 hover:opacity-100 text-xl" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardBody className="pt-16 pb-4">
-                  <h2 className="text-lg font-bold text-center mb-1">
+                <CardHeader className="p-4">
+                  <h2 className="text-lg font-bold text-center">
                     {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.username}
                   </h2>
-                  <p className="text-sm text-gray-500 text-center mb-4">@{user?.username}</p>
-                  
-                  <div className="space-y-2 mt-4">
+                  <p className="text-sm text-gray-500 text-center">@{user?.username}</p>
+                </CardHeader>
+                <CardBody className="pb-4">
+                  <div className="space-y-2">
                     <button 
                       className={`flex items-center gap-2 p-2 w-full rounded-md transition-colors ${
                         activeTab === "profile" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"

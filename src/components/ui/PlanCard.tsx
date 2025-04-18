@@ -84,8 +84,17 @@ const PlanCard = ({
       return `${creator.firstName} ${creator.lastName}`;
     }
     
+    if (creator.name) {
+      return creator.name;
+    }
+    
     if (creator.firstName) {
       return creator.firstName;
+    }
+    
+    if (creator.email && creator.email.includes('@')) {
+      // E-posta adresinden kullanıcı adı oluştur - @ öncesini al
+      return creator.email.split('@')[0];
     }
     
     if (creator.username) {
@@ -418,6 +427,7 @@ const PlanCard = ({
                   sizes="32px"
                   className="object-cover"
                   onError={handleAvatarError}
+                  priority
                 />
               </div>
               <div>
@@ -439,7 +449,7 @@ const PlanCard = ({
             </div>
             {isOwner && (
               <span className="ml-auto bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">
-                Lider
+                Creator
               </span>
             )}
           </div>
@@ -450,7 +460,9 @@ const PlanCard = ({
           <div className="flex items-center justify-between text-gray-500 text-sm">
             <div className="flex items-center gap-1">
               <FaCalendarAlt className="text-blue-500" aria-hidden="true" />
-              <span>{formatDate(date.toISOString())}</span>
+              <span>
+                {formatDate(date.toISOString())} • {date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
             </div>
             <div className="flex items-center gap-1">
               <FaMapMarkerAlt className="text-green-500" aria-hidden="true" />

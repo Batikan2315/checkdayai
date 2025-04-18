@@ -118,11 +118,15 @@ const FilterBar = ({
 
 // Plan türlerini kullanmak için basit arayüzler
 interface Creator {
-  _id?: string;
+  _id: string; // ID'yi zorunlu yap
   username: string;
   firstName?: string;
   lastName?: string;
+  name?: string;
   profilePicture?: string;
+  image?: string;
+  googleProfilePicture?: string;
+  email?: string;
 }
 
 export default function PlansClient() {
@@ -197,7 +201,8 @@ export default function PlansClient() {
   
   const activeFiltersCount = Object.values(filters).filter(Boolean).length - (filters.sortBy ? 1 : 0);
   
-  const getCreatorInfo = (creator: any): Creator | undefined => {
+  const getCreatorInfo = (creator: any): Creator => {
+    // Creator hiç yok ise varsayılan değer kullan
     if (!creator) {
       return {
         _id: "unknown",
@@ -206,6 +211,7 @@ export default function PlansClient() {
       };
     }
     
+    // Creator string ise (ID)
     if (typeof creator === 'string') {
       return {
         _id: creator,
@@ -214,34 +220,41 @@ export default function PlansClient() {
       };
     }
     
-    if (typeof creator === 'object') {
-      // ObjectId olma ihtimaline karşı
-      if (creator._bsontype === 'ObjectID') {
-        return {
-          _id: creator.toString ? creator.toString() : undefined,
-          username: 'Kullanıcı',
-          profilePicture: '/images/avatars/default.png'
-        };
-      }
-      
-      // Gerçek kullanıcı nesnesi
-      const username = creator.username || 'Kullanıcı';
-      const firstName = creator.firstName || '';
-      const lastName = creator.lastName || '';
-      
+    // Creator ObjectID ise
+    if (creator._bsontype === 'ObjectID' || 
+        (creator._id && typeof creator._id === 'string' && !creator.username)) {
       return {
-        _id: creator._id ? (typeof creator._id === 'object' ? creator._id.toString() : creator._id) : undefined,
-        username: username,
-        firstName: firstName,
-        lastName: lastName,
-        profilePicture: creator.profilePicture || '/images/avatars/default.png'
+        _id: creator.toString ? creator.toString() : String(creator),
+        username: 'Kullanıcı',
+        profilePicture: '/images/avatars/default.png'
       };
     }
     
+    // Normal kullanıcı nesnesi - profil resmi kontrolü yap
+    const profilePicture = creator.profilePicture || 
+                           creator.googleProfilePicture || 
+                           creator.image || 
+                           '/images/avatars/default.png';
+    
+    // Kullanıcı adı kontrolü
+    const username = creator.username || 
+                    (creator.email ? creator.email.split('@')[0] : 'Kullanıcı');
+    
+    // Tam isim kontrolü
+    const firstName = creator.firstName || '';
+    const lastName = creator.lastName || '';
+    const name = creator.name || '';
+    
     return {
-      _id: "unknown",
-      username: 'Kullanıcı',
-      profilePicture: '/images/avatars/default.png'
+      _id: creator._id ? (typeof creator._id === 'object' ? creator._id.toString() : creator._id) : 'unknown',
+      username,
+      firstName,
+      lastName,
+      name,
+      profilePicture,
+      image: creator.image,
+      googleProfilePicture: creator.googleProfilePicture,
+      email: creator.email
     };
   };
   

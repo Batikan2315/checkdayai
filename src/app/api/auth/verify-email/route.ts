@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
             <div class="container">
               <h1>Doğrulama Bağlantısı Geçersiz</h1>
               <p>Bu doğrulama bağlantısı geçersiz veya süresi dolmuş. Lütfen yeni bir doğrulama bağlantısı talep edin.</p>
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/giris" class="button">Giriş Sayfasına Dön</a>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login" class="button">Giriş Sayfasına Dön</a>
             </div>
           </body>
         </html>
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
             <div class="container">
               <h1>Kullanıcı Bulunamadı</h1>
               <p>Bu e-posta adresiyle kayıtlı bir kullanıcı bulunamadı. Lütfen önce kayıt olun.</p>
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/giris" class="button">Giriş Sayfasına Dön</a>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login" class="button">Giriş Sayfasına Dön</a>
             </div>
           </body>
         </html>
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
             <div class="container">
               <h1>E-posta Zaten Doğrulanmış</h1>
               <p>E-posta adresiniz zaten doğrulanmış. Hesabınıza giriş yapabilirsiniz.</p>
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/giris" class="button">Giriş Yap</a>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login" class="button">Giriş Yap</a>
             </div>
           </body>
         </html>
@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
             <div class="success-icon">✓</div>
             <h1>E-posta Doğrulandı</h1>
             <p>E-posta adresiniz başarıyla doğrulandı. Artık hesabınıza giriş yapabilirsiniz.</p>
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/giris" class="button">Giriş Yap</a>
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login" class="button">Giriş Yap</a>
           </div>
         </body>
       </html>
@@ -187,7 +187,7 @@ export async function GET(req: NextRequest) {
           <div class="container">
             <h1>Sunucu Hatası</h1>
             <p>E-posta doğrulama sırasında bir sorun oluştu. Lütfen daha sonra tekrar deneyin.</p>
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/giris" class="button">Giriş Sayfasına Dön</a>
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login" class="button">Giriş Sayfasına Dön</a>
           </div>
         </body>
       </html>

@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     const plan = await Plan.create(planData);
     
     // Oluşturulan planı kullanıcı bilgileriyle birlikte döndür
-    const populatedPlan = await Plan.findById(plan._id).populate('creator', 'username firstName lastName profilePicture');
+    const populatedPlan = await Plan.findById(plan._id).populate('creator', 'username firstName lastName name profilePicture');
     
     return NextResponse.json(populatedPlan);
   } catch (error: any) {

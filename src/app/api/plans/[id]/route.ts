@@ -17,7 +17,7 @@ export async function GET(
     const id = params.id;
 
     const plan = await Plan.findById(id)
-      .populate('creator', 'username firstName lastName profilePicture googleProfilePicture email oauth_id')
+      .populate('creator', 'username firstName lastName name profilePicture googleProfilePicture email oauth_id')
       .populate('participants', 'username firstName lastName profilePicture googleProfilePicture email')
       .populate('leaders', 'username firstName lastName profilePicture googleProfilePicture email')
       .lean();
@@ -48,7 +48,7 @@ export async function PUT(
       { $set: body },
       { new: true }
     )
-      .populate('creator', 'username firstName lastName profilePicture googleProfilePicture email oauth_id')
+      .populate('creator', 'username firstName lastName name profilePicture googleProfilePicture email oauth_id')
       .populate('participants', 'username firstName lastName profilePicture googleProfilePicture email')
       .populate('leaders', 'username firstName lastName profilePicture googleProfilePicture email')
       .lean();

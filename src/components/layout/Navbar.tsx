@@ -34,7 +34,7 @@ const Navbar: React.FC = () => {
   const inactiveClass = "flex items-center text-muted-foreground hover:text-primary";
   
   // Profil aktif kontrolü
-  const profileActive = pathname?.includes(`/${session?.user?.username}`) || pathname?.includes("/profile");
+  const profileActive = pathname?.includes("/profile");
 
   const toggleNotifications = () => {
     setShowNotifications(prev => !prev);
@@ -147,155 +147,6 @@ const Navbar: React.FC = () => {
     },
   ];
 
-  // Mevcut FaBell butonunu işlevsel hale getirme
-  const renderNotificationButton = () => (
-    <div className="relative">
-      <button 
-        className="p-2 text-gray-500 dark:text-gray-400 hover:text-blue-600 focus:outline-none"
-        onClick={toggleNotifications}
-        aria-label="Bildirimleri göster"
-      >
-        <FaBell className="w-6 h-6" />
-        {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {showNotifications && (
-        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 overflow-hidden border border-gray-200 dark:border-gray-700">
-          <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Bildirimler</h3>
-            <div className="flex space-x-2">
-              {unreadCount > 0 && (
-                <button 
-                  onClick={handleMarkAllAsRead}
-                  className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  Tümünü Okundu İşaretle
-                </button>
-              )}
-              <button 
-                onClick={() => setShowNotifications(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-              >
-                <FaTimes />
-              </button>
-            </div>
-          </div>
-          
-          {/* Filtre bölümü ekle */}
-          <div className="p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-            <div className="flex flex-wrap gap-1">
-              <button
-                onClick={() => filterByType(null)}
-                className={`text-xs px-2 py-1 rounded ${
-                  !activeType 
-                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' 
-                    : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                }`}
-              >
-                Tümü
-              </button>
-              {notificationTypes.map(type => (
-                <button
-                  key={type.key}
-                  onClick={() => filterByType(type.key)}
-                  className={`text-xs px-2 py-1 rounded ${
-                    activeType === type.key 
-                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' 
-                      : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                  }`}
-                >
-                  {type.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-between mt-2">
-              <button
-                onClick={handleDeleteAll}
-                className="text-xs text-red-600 hover:text-red-800"
-              >
-                Tümünü Sil
-              </button>
-              {activeType ? (
-                <button
-                  onClick={() => handleDeleteByType(activeType)}
-                  className="text-xs text-red-600 hover:text-red-800"
-                >
-                  Filtrelenenleri Sil
-                </button>
-              ) : (
-                <button
-                  onClick={() => fetchNotifications({ force: true })}
-                  className="text-xs text-blue-600 hover:text-blue-800"
-                >
-                  Yenile
-                </button>
-              )}
-            </div>
-          </div>
-          
-          <div className="max-h-96 overflow-y-auto">
-            {loading ? (
-              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                Yükleniyor...
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                Bildiriminiz bulunmuyor
-              </div>
-            ) : (
-              notifications.map((notification) => (
-                <div 
-                  key={notification._id}
-                  className={`p-3 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer ${
-                    !notification.isRead ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                  }`}
-                  onClick={() => handleNotificationClick(notification._id, notification.link)}
-                >
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0 pt-1">
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    <div className="ml-3 flex-1">
-                      <div className="flex justify-between items-start">
-                        <p className={`text-sm font-medium ${
-                          !notification.isRead ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'
-                        }`}>
-                          {notification.title}
-                        </p>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteNotification(notification._id);
-                          }}
-                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                        >
-                          <FaTimes size={12} />
-                        </button>
-                      </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                        {formatDistanceToNow(new Date(notification.createdAt), {
-                          addSuffix: true,
-                          locale: tr
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
   // Profil resmi için yardımcı fonksiyon
   const getProfileImage = () => {
     if (!session?.user) return null;
@@ -305,8 +156,6 @@ const Navbar: React.FC = () => {
     
     // Eğer custom user verisi varsa
     if (session.user.profilePicture) return session.user.profilePicture;
-    
-    // Google profil resmi yoktur, custom tip tanımında olmadığı için kaldırıyoruz
     
     // Varsayılan avatar
     return "/images/avatars/default.png";
@@ -349,41 +198,41 @@ const Navbar: React.FC = () => {
           </div>
           
           {/* Desktop Navigation */}
-          <div className="hidden md:flex gap-6 items-center p-2">
+          <div className="hidden md:flex gap-8 items-center p-2">
             <Link
               href="/plans"
               className={`${
                 pathname?.includes("/plans") ? activeClass : inactiveClass
-              } hover:text-blue-600 transition-colors`}
+              } hover:text-blue-600 transition-colors text-sm font-medium`}
             >
-              <FaClipboardList className="h-5 w-5 mr-1" />
+              <FaClipboardList className="h-5 w-5 mr-2" />
               <span>Planlar</span>
             </Link>
             <Link
               href="/calendar"
               className={`${
                 pathname?.includes("/calendar") ? activeClass : inactiveClass
-              } hover:text-blue-600 transition-colors`}
+              } hover:text-blue-600 transition-colors text-sm font-medium`}
             >
-              <FaCalendarAlt className="h-5 w-5 mr-1" />
+              <FaCalendarAlt className="h-5 w-5 mr-2" />
               <span>Takvim</span>
             </Link>
             <Link
               href="/plan/create"
               className={`${
                 pathname?.includes("/plan/create") ? activeClass : inactiveClass
-              } hover:text-blue-600 transition-colors`}
+              } hover:text-blue-600 transition-colors text-sm font-medium`}
             >
-              <FaPlusCircle className="h-5 w-5 mr-1" />
+              <FaPlusCircle className="h-5 w-5 mr-2" />
               <span>Plan Oluştur</span>
             </Link>
             <Link
               href="/ai-check"
               className={`${
                 pathname?.includes("/ai-check") ? activeClass : inactiveClass
-              } hover:text-blue-600 transition-colors`}
+              } hover:text-blue-600 transition-colors text-sm font-medium px-3 py-2 bg-blue-50 rounded-full`}
             >
-              <FaRobot className="h-5 w-5 mr-1" />
+              <FaRobot className="h-5 w-5 mr-2" />
               <span>AI Check</span>
             </Link>
             
@@ -402,7 +251,7 @@ const Navbar: React.FC = () => {
             
             {/* Profile Link - Only show image */}
             <Link
-              href={`/${session?.user?.username || "profile"}`}
+              href="/profile"
               className="flex flex-col items-center ml-2 p-1 hover:bg-gray-100 rounded-full transition-colors"
             >
               <div className="h-8 w-8 rounded-full overflow-hidden border border-gray-200">
@@ -416,11 +265,7 @@ const Navbar: React.FC = () => {
           </div>
           
           {/* Mobile Logo and Notification Button */}
-          <div className="flex md:hidden items-center justify-between w-full">
-            <Link href="/" className="pl-2 flex items-center">
-              <span className="text-lg font-bold bg-gradient-to-r from-blue-500 to-indigo-600 text-transparent bg-clip-text">Checkday</span>
-            </Link>
-            
+          <div className="flex md:hidden items-center justify-end">
             <button 
               onClick={toggleNotifications} 
               className="relative mr-2 p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -520,7 +365,7 @@ const Navbar: React.FC = () => {
                         {getNotificationIcon(notification.type)}
                       </div>
                       <div className="flex-1">
-                        <p className={`text-sm font-medium ${!notification.isRead ? "text-gray-900" : "text-gray-600"}`}>
+                        <p className="text-sm font-medium text-gray-900">
                           {notification.title}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
@@ -533,84 +378,74 @@ const Navbar: React.FC = () => {
                           })}
                         </p>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteNotification(notification._id);
-                        }}
-                        className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-full"
-                      >
-                        <FaTimes size={12} />
-                      </button>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-center py-6 text-gray-500">Henüz bildiriminiz yok</p>
+                <div className="text-center py-6 text-gray-500">
+                  Bildiriminiz bulunmuyor
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Bottom mobile navigation */}
-      <div className="bottom-nav md:hidden fixed bottom-0 z-10 w-full border-t bg-white shadow-lg">
-        <div className="flex justify-around items-center p-2">
-          <Link
-            href="/plans"
-            className={`flex flex-col items-center p-1 ${
-              pathname?.includes("/plans") ? "text-blue-600" : "text-gray-500"
-            }`}
+      {/* Mobil Alt Navigasyon Menüsü */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-10">
+        <div className="flex justify-between px-2 py-2">
+          <Link 
+            href="/plans" 
+            className={`flex flex-col items-center justify-center w-1/5 ${pathname?.includes("/plans") ? "text-blue-600" : "text-gray-500"}`}
           >
             <FaClipboardList className="h-5 w-5" />
             <span className="text-xs mt-1">Planlar</span>
           </Link>
-          <Link
-            href="/calendar"
-            className={`flex flex-col items-center p-1 ${
-              pathname?.includes("/calendar") ? "text-blue-600" : "text-gray-500"
-            }`}
+          
+          <Link 
+            href="/calendar" 
+            className={`flex flex-col items-center justify-center w-1/5 ${pathname?.includes("/calendar") ? "text-blue-600" : "text-gray-500"}`}
           >
             <FaCalendarAlt className="h-5 w-5" />
             <span className="text-xs mt-1">Takvim</span>
           </Link>
-          <Link
-            href="/plan/create"
-            className={`flex flex-col items-center p-1 ${
-              pathname?.includes("/plan/create") ? "text-blue-600" : "text-gray-500"
-            }`}
+          
+          <Link 
+            href="/plan/create" 
+            className={`flex flex-col items-center justify-center w-1/5 ${pathname?.includes("/plan/create") ? "text-blue-600" : "text-gray-500"}`}
           >
             <FaPlusCircle className="h-5 w-5" />
             <span className="text-xs mt-1">Oluştur</span>
           </Link>
-          <Link
-            href="/ai-check"
-            className={`flex flex-col items-center p-1 ${
-              pathname?.includes("/ai-check") ? "text-blue-600" : "text-gray-500"
-            }`}
+          
+          <Link 
+            href="/ai-check" 
+            className={`flex flex-col items-center justify-center w-1/5 ${pathname?.includes("/ai-check") ? "text-blue-600" : "text-gray-500"}`}
           >
             <FaRobot className="h-5 w-5" />
             <span className="text-xs mt-1">AI Check</span>
           </Link>
-          <Link
-            href={`/${session?.user?.username || "profile"}`}
-            className={`flex flex-col items-center p-1 ${
-              profileActive ? "text-blue-600" : "text-gray-500"
-            }`}
+          
+          <Link 
+            href="/profile" 
+            className={`flex flex-col items-center justify-center w-1/5 ${pathname?.includes("/profile") ? "text-blue-600" : "text-gray-500"}`}
           >
-            <div className="h-5 w-5 rounded-full overflow-hidden border border-gray-200">
+            <div className="h-5 w-5 relative">
               <img 
                 src={session?.user?.profilePicture || session?.user?.image || "/images/avatars/default.png"}
                 alt="Profil"
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover rounded-full"
               />
             </div>
             <span className="text-xs mt-1">Profil</span>
           </Link>
         </div>
       </div>
+
+      {/* Mobil menü için sayfa altında padding bırakma */}
+      <div className="md:hidden h-14 w-full"></div>
     </>
   );
 };
 
-export default Navbar; 
+export default Navbar;

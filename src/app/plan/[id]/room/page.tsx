@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
-import { FaExclamationTriangle, FaArrowLeft, FaPaperPlane } from "react-icons/fa";
+import { FaExclamationTriangle, FaArrowLeft, FaPaperPlane, FaCalendarAlt } from "react-icons/fa";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -32,6 +32,7 @@ interface IPlan {
   };
   participants?: Array<{_id: string}>;
   leaders?: Array<{_id: string}>;
+  startDate?: string;
 }
 
 export default function PlanRoom() {
@@ -99,16 +100,22 @@ export default function PlanRoom() {
         const planData = await planResponse.json();
         setPlan(planData);
 
-        // Kullanıcının katılımcı veya oluşturucu olup olmadığını kontrol et
+        // Kullanıcının katılımcı veya Creator olup olmadığını kontrol et
         const isUserCreator = planData.creator?._id === session.user.id;
         const isUserParticipant = planData.participants?.some(
-          (participant: any) => participant.userId === session.user.id && participant.status === "ACCEPTED"
+          (participant: any) => participant._id === session.user.id || participant.userId === session.user.id
         );
 
-        if (isUserCreator || isUserParticipant) {
+        if (isUserCreator) {
+          // Creator her zaman erişime sahiptir
+          setHasAccess(true);
+          fetchMessages();
+        } else if (isUserParticipant) {
+          // Katılımcı da erişime sahiptir
           setHasAccess(true);
           fetchMessages();
         } else {
+          // Ne creator ne de katılımcı değilse erişim yok
           setHasAccess(false);
           setError("Bu plan odasına erişmek için plana katılmanız gerekmektedir.");
         }
@@ -131,7 +138,7 @@ export default function PlanRoom() {
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
 
-    // Mesaj göndermek için katılımcı veya oluşturucu olmalısınız
+    // Mesaj göndermek için katılımcı veya creator olmalısınız
     if (!hasAccess) {
       toast.error("Mesaj göndermek için plana katılmanız gerekmektedir.");
       return;
@@ -247,7 +254,7 @@ export default function PlanRoom() {
         </div>
         <div className="text-center mt-4">
           <Button
-            onClick={() => window.location.href = "/giris"}
+            onClick={() => window.location.href = "/login"}
           >
             Giriş Yap
           </Button>
@@ -302,6 +309,21 @@ export default function PlanRoom() {
       
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h1 className="text-2xl font-bold mb-2">{plan?.title || 'Plan Odası'}</h1>
+        <div className="flex items-center text-gray-600 mb-4">
+          <FaCalendarAlt className="mr-2" />
+          {plan?.startDate && (
+            <span>
+              {new Date(plan.startDate).toLocaleDateString('tr-TR', {
+                day: 'numeric', 
+                month: 'long', 
+                year: 'numeric'
+              })} • {new Date(plan.startDate).toLocaleTimeString('tr-TR', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </span>
+          )}
+        </div>
         <p className="text-gray-600 mb-6">Plan katılımcıları ile iletişim kurabileceğiniz özel bir alan.</p>
         
         <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6" role="alert">

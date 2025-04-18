@@ -11,8 +11,8 @@ const RESERVED_USERNAMES = [
   'checkday', 'app', 'dashboard', 'user', 'users', 'account', 'accounts', 'auth',
   'static', 'assets', 'public', 'images', 'js', 'css', 'reset-password',
   
-  // Türkçe karşılıkları (geçici olarak hem İngilizce hem Türkçe korunacak)
-  'planlar', 'takvim', 'profil', 'giris', 'kayit', 'sifremi-sifirla',
+  // Additional reserved terms
+  'plans', 'calendar', 'profile', 'login', 'register', 'reset-password',
   'root', 'moderator', 'info', 'team', 'official', 'founder', 'ceo',
   'administrator', 'mod', 'system', 'username', 'guest', 'anonymous',
   'undefined', 'null'

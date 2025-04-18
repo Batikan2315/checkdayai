@@ -27,7 +27,10 @@ import {
   FaShare,
   FaEdit,
   FaTimes,
-  FaImage
+  FaImage,
+  FaUserPlus,
+  FaUserMinus,
+  FaCalendarPlus
 } from "react-icons/fa";
 import { BsCalendar } from "react-icons/bs";
 import { PlanActions } from "@/components/PlanActions";
@@ -114,15 +117,19 @@ export default function PlanDetail() {
         
         // Kullanıcı katılım durumunu kontrol et
         if (session?.user?.id) {
-          const isJoined = data.participants?.some(
+          // Creator kontrolü
+          const isCreator = data.creator?._id === session.user.id || 
+                          data.creator === session.user.id;
+                          
+          // Katılımcı kontrolü
+          const isParticipant = data.participants?.some(
             (p: any) => 
               p?._id?.toString() === session.user.id || 
               p?.toString() === session.user.id
           );
-          setShowContent(isJoined);
           
-          // Plan oluşturucusu veya katılımcıysa içeriği göster
-          if (isJoined || data.creator?._id === session.user.id) {
+          // Creator veya katılımcıysa içeriği göster
+          if (isCreator || isParticipant) {
             setShowContent(true);
           }
         }
@@ -213,6 +220,9 @@ export default function PlanDetail() {
       // Planı güncelle
       const updatedPlan = await fetch(`/api/plans/${id}`).then(res => res.json());
       setPlan(updatedPlan);
+      
+      // Planlar sayfasına yönlendir
+      router.push('/plans');
       
     } catch (error: any) {
       toast.error(error.message || 'Plandan ayrılırken bir hata oluştu');
@@ -353,8 +363,8 @@ export default function PlanDetail() {
   };
 
   const handleAddLeader = () => {
-    // TODO: Lider ekleme modalı
-    alert('Lider ekleme özelliği yakında eklenecek!');
+    // TODO: Creator ekleme modalı
+    alert('Creator ekleme özelliği yakında eklenecek!');
   };
 
   // Kullanıcının bu plana katılmış olup olmadığını kontrol et
@@ -370,7 +380,7 @@ export default function PlanDetail() {
     return isCreator || isParticipant;
   }, [plan, userId]);
   
-  // Kullanıcının plan lideri olup olmadığını kontrol et
+  // Kullanıcının plan creator'ı olup olmadığını kontrol et
   const isLeader = userId && plan?.leaders ? plan.leaders.some((leader: any) => {
     if (!leader) return false;
     if (typeof leader === 'object') {
@@ -379,7 +389,7 @@ export default function PlanDetail() {
     return leader === userId;
   }) : false;
   
-  // Kullanıcının düzenleme yetkisi var mı (oluşturucu veya lider)
+  // Kullanıcının düzenleme yetkisi var mı (oluşturucu veya creator)
   const canEdit = isUserJoined || isLeader;
   
   // Plan saatinin geçip geçmediğini kontrol et
@@ -389,19 +399,19 @@ export default function PlanDetail() {
   const showJoinButton = !isUserJoined && !canEdit && !isPlanPast;
   const showLeaveButton = isUserJoined && !canEdit && !isPlanPast;
   
-  // Liderler bilgilerini gösterme
+  // Creator bilgilerini gösterme
   const renderLeadersInfo = useMemo(() => {
     if (!plan || !plan.leaders || !Array.isArray(plan.leaders) || plan.leaders.length === 0) return null;
     
     return (
       <div className="mb-6">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-lg font-semibold">Liderler</h2>
+          <h2 className="text-lg font-semibold">Creators</h2>
           {canEdit && (
             <button 
               onClick={handleAddLeader}
               className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600"
-              aria-label="Lider Ekle"
+              aria-label="Creator Ekle"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -411,21 +421,21 @@ export default function PlanDetail() {
         </div>
         <div className="flex flex-wrap gap-3">
           {plan.leaders.map((leader: any, index: number) => {
-            let leaderName = 'Anonim';
-            let leaderAvatar = '/images/avatars/default.png';
-            let leaderUsername = '';
+            let creatorName = 'Anonim';
+            let creatorAvatar = '/images/avatars/default.png';
+            let creatorUsername = '';
             
             if (typeof leader === 'object') {
               if (leader.firstName && leader.lastName) {
-                leaderName = `${leader.firstName} ${leader.lastName}`;
+                creatorName = `${leader.firstName} ${leader.lastName}`;
               } else if (leader.username) {
-                leaderName = `@${leader.username}`;
+                creatorName = `@${leader.username}`;
               }
               
-              leaderUsername = leader.username || '';
+              creatorUsername = leader.username || '';
               
               if (leader.profilePicture) {
-                leaderAvatar = leader.profilePicture;
+                creatorAvatar = leader.profilePicture;
               }
             }
             
@@ -433,8 +443,8 @@ export default function PlanDetail() {
               <div key={index} className="flex items-center">
                 <div className="w-8 h-8 rounded-full overflow-hidden mr-2">
                   <img 
-                    src={leaderAvatar} 
-                    alt={leaderName}
+                    src={creatorAvatar} 
+                    alt={creatorName}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = '/images/avatars/default.png';
@@ -442,13 +452,13 @@ export default function PlanDetail() {
                   />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm">{leaderName}</span>
-                  {leaderUsername && (
+                  <span className="text-sm">{creatorName}</span>
+                  {creatorUsername && (
                     <a 
-                      href={`/@${leaderUsername}`} 
+                      href={`/@${creatorUsername}`} 
                       className="text-xs text-blue-500 hover:underline"
                     >
-                      @{leaderUsername}
+                      @{creatorUsername}
                     </a>
                   )}
                 </div>
@@ -556,6 +566,21 @@ export default function PlanDetail() {
   
   // Kullanıcı plana katılmamışsa ve planın oluşturucusu değilse
   if (!showContent && session?.user?.id) {
+    // Creator kontrolü
+    const isCreator = plan?.creator?._id === session.user.id || 
+                       plan?.creator === session.user.id;
+    
+    // Eğer creator ise içeriği göster
+    if (isCreator) {
+      return (
+        <div className="container mx-auto px-4 py-10">
+          {/* Plan içeriği normal şekilde render edilecek */}
+          {/* Bu kısımda kod tekrarı yapmak yerine ana return kısmına devam et */}
+        </div>
+      );
+    }
+    
+    // Creator değilse katılması gerektiğini belirt
     return (
       <div className="container mx-auto px-4 py-10">
         <Card>
@@ -565,7 +590,12 @@ export default function PlanDetail() {
               Bu plan sadece katılımcılar tarafından görüntülenebilir. Detayları görmek için plana katılın.
             </p>
             <div className="max-w-xs mx-auto">
-              <PlanActions plan={plan} />
+              <Button
+                onClick={handleJoin}
+                loading={joining}
+              >
+                <FaUserPlus className="mr-2" /> Katıl
+              </Button>
             </div>
           </CardBody>
         </Card>
@@ -584,7 +614,7 @@ export default function PlanDetail() {
               Bu plan sadece giriş yapmış kullanıcılar tarafından görüntülenebilir.
             </p>
             <div className="max-w-xs mx-auto">
-              <Button variant="primary" onClick={() => router.push('/giris')}>
+              <Button variant="primary" onClick={() => router.push('/login')}>
                 Giriş Yap
               </Button>
             </div>
@@ -667,16 +697,39 @@ export default function PlanDetail() {
         </div>
 
         {/* İşlem Butonları */}
-        <div className="mb-6 flex flex-wrap gap-2">
-          {canEdit && (
-            <Button variant="outline" onClick={handleEditPlan}>
-              <FaPencilAlt className="mr-2" /> Düzenle
+        <div className="flex flex-wrap gap-2 mb-6">
+          {/* Katılma Butonu */}
+          {showJoinButton && (
+            <Button
+              onClick={handleJoin}
+              loading={joining}
+            >
+              <FaUserPlus className="mr-2" /> Katıl
             </Button>
           )}
 
-          {canEdit && (
-            <Button variant="outline" onClick={handleDeletePlan}>
-              <FaTrash className="mr-2" /> Sil
+          {/* Ayrılma Butonu */}
+          {showLeaveButton && (
+            <Button
+              variant="outline"
+              onClick={handleLeave}
+              loading={leaving}
+            >
+              <FaUserMinus className="mr-2" /> Ayrıl
+            </Button>
+          )}
+
+          {/* Takvime Ekle Butonu */}
+          {(isUserJoined || canEdit) && (
+            <Button variant="outline" onClick={handleAddToCalendar}>
+              <FaCalendarPlus className="mr-2" /> Takvime Ekle
+            </Button>
+          )}
+
+          {/* Düzenleme Butonu - Sadece yaratıcı ve liderler görebilir */}
+          {isCreator && (
+            <Button variant="outline" onClick={handleEditPlan}>
+              <FaEdit className="mr-2" /> Düzenle
             </Button>
           )}
 
@@ -706,7 +759,7 @@ export default function PlanDetail() {
           </Button>
 
           {/* Plan Odası Butonu - Sadece katılımcılar ve oluşturucu görebilir */}
-          {(isParticipant || isCreator) && (
+          {(isUserJoined || isCreator) && (
             <Link href={`/plan/${id}/room`} passHref>
               <Button 
                 variant="outline"
@@ -754,7 +807,7 @@ export default function PlanDetail() {
               {plan.creator && typeof plan.creator !== 'string' && (
                 <div className="flex items-center">
                   <FaUsers className="mr-1 h-4 w-4" />
-                  <span>Oluşturan: {plan.creator.name}</span>
+                  <span>Creator: {plan.creator.name}</span>
                 </div>
               )}
               
@@ -832,7 +885,7 @@ export default function PlanDetail() {
             
             <Card>
               <CardHeader>
-                <h3 className="font-semibold text-lg">Organizatör</h3>
+                <h3 className="font-semibold text-lg">Creator</h3>
               </CardHeader>
               <CardBody>
                 {plan?.creator && (
@@ -840,7 +893,7 @@ export default function PlanDetail() {
                     <div className="w-10 h-10 rounded-full overflow-hidden">
                       <img 
                         src={plan.creator.profilePicture || DEFAULT_AVATAR} 
-                        alt={plan.creator.name || 'Organizatör'}
+                        alt={plan.creator.name || 'Creator'}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
@@ -865,7 +918,7 @@ export default function PlanDetail() {
                   </div>
                 )}
                 {!plan?.creator && (
-                  <div className="text-gray-500">Organizatör bilgisi bulunamadı</div>
+                  <div className="text-gray-500">Creator bilgisi bulunamadı</div>
                 )}
               </CardBody>
             </Card>
