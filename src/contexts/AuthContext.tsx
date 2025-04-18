@@ -189,9 +189,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (cachedUser && cachedUser.id === session.user?.id) {
         setUser(cachedUser);
         setLoading(false);
+        
+        // Google kullanıcıları için profil kontrolü
+        if (cachedUser.provider === 'google' && cachedUser.needsSetup) {
+          // Kullanıcının profil sayfasına yönlendirilmesi gerekiyorsa
+          router.push('/profile');
+        }
       } else {
         // Aksi halde API'den kullanıcı bilgilerini al
-        refreshUserData(true);
+        refreshUserData(true).then(userData => {
+          // Google kullanıcıları için profil kontrolü
+          if (userData && userData.provider === 'google' && userData.needsSetup) {
+            // Kullanıcının profil sayfasına yönlendirilmesi gerekiyorsa
+            router.push('/profile');
+          }
+        });
       }
     } else if (status === 'unauthenticated') {
       console.log('Oturum yok, kullanıcı temizleniyor');
@@ -199,7 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
       localStorage.removeItem(USER_CACHE_KEY);
     }
-  }, [status, session, refreshUserData]);
+  }, [status, session, refreshUserData, router]);
 
   // Auth durumunu kontrol et
   const checkAuth = useCallback(async () => {
@@ -320,9 +332,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Tarayıcı önbelleğini zorla yenile
       await signOut({ redirect: false });
       
-      // Yeni oturum aç
+      // Yeni oturum aç - callback URL'yi profil sayfasına yönlendir
       await signIn('google', { 
-        callbackUrl: '/',
+        callbackUrl: '/profile',
         redirect: true
       });
       
