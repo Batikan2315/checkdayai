@@ -52,12 +52,32 @@ const nextConfig = {
     // İstemci ve sunucu tarafı ayrımı için
     if (isServer) {
       // Sunucu taraflı bundle'a girmemesi gereken modüller
-      config.externals = [...(config.externals || []), 
+      const tarayiciModulleri = [
         'socket.io-client', 
         'engine.io-client',
         'engine.io-parser',
         'socket.io-parser',
-        'debug'
+        'debug',
+        'sockjs-client',
+        'xmlhttprequest-ssl',
+        'engine.io-client',
+        'ws',
+        'component-emitter'
+      ];
+      
+      // Tüm browser modüllerini engelle
+      config.externals = [
+        ...(config.externals || []),
+        (context, request, callback) => {
+          // Tarayıcı modüllerini kontrol et
+          if (tarayiciModulleri.includes(request)) {
+            // Modülü hariç tut
+            return callback(null, `commonjs ${request}`);
+          }
+          
+          // Aksi takdirde normal işlem
+          callback();
+        }
       ];
     }
 
